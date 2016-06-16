@@ -1,10 +1,8 @@
 # iRep.py and bPTR.py
 
-These scripts are provided for peer-review of the manuscript:
+These scripts are described in:
 
-“In situ replication rates for uncultivated bacteria in natural microbial communities” - Christopher T. Brown, Matthew R. Olm, Brian C. Thomas, Jillian F. Banfield
-
-All materials will be made publicly available upon acceptance.
+“In situ replication rates for uncultivated bacteria in microbial communities” - Christopher T. Brown, Matthew R. Olm, Brian C. Thomas, Jillian F. Banfield
 
 Scripts require python2.7 and the following packages:
 lmfit
@@ -15,12 +13,12 @@ seaborn
 matplotlib
 cPickle
 
-Example usage:
+##Example usage:
 
-# iRep
+### iRep
 ./bin/iRep.py -f sample_data/l_gasseri.fna -s sample_data/l_gasseri*sam -o test.iRep
 
-# bPTR
+### bPTR
 ./bin/bPTR.py -f sample_data/l_gasseri.fna -s sample_data/l_gasseri*sam -o test.bPTR.tsv -plot test.bPTR.pdf -m coverage
 
 Example output is provided in sample_output. 
