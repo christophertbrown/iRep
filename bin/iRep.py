@@ -1,7 +1,8 @@
 #!/usr/bin/env python2.7
 
 """
-script for measuring microbial population replication rates (iRep)
+script for estimating microbial population replication rates (iRep)
+from slope of coverage across complete or draft-quality genomes
 
 Chris Brown
 ctb@berkeley.edu
@@ -144,7 +145,7 @@ def simple_plot(xy, xy2 = False, horiz = [], title = 'n/a'):
     plt.title(title)
     plt.show()
 
-def calc_coverage(genomes, mappings, id2g):
+def calc_coverage(genomes, mappings, id2g, mask_edges = True):
     """
     for each sample:
         calcualte coverage at each position in genome
@@ -170,8 +171,11 @@ def calc_coverage(genomes, mappings, id2g):
         for sample in samples.values():
             for contig in order:
                 try:
-                    sample['cov'].extend(sample['contigs'][contig])
-                    del sample['contigs'][contig]
+                    seq = sample['contigs'][contig]
+                    if mask_edges is True:
+                        seq = seq[100:len(seq)-100]
+                    sample['cov'].extend(seq)
+#                    del sample['contigs'][contig]
                 except:
                     continue
             sample['avg_cov'] = np.average(sample['cov'])
@@ -239,9 +243,10 @@ def fragments_test(sample, threads, n = 100, \
     """
     g, s, length, sample = sample
     X, Y = sample['LTwindows']
-    sample['test'] = [[], []]
+    sample['test'] = [[], [], []]
     random_fragments = []
-    l2p = {l:str(int(float(l)/length*100)) + '%' for l in lengths} # length to percent of genome
+    # length to percent of genome
+    l2p = {l:str(int(float(l)/length*100)) + '%' for l in lengths}
     for l in lengths:
         if l >= length:
             continue
@@ -262,12 +267,28 @@ def fragments_test(sample, threads, n = 100, \
         if m < 0:
             m = -m
         sample['test'][0].append('%s (%s)' % (l, l2p[l]))
-        sample['test'][1].append(m)
+        sample['test'][1].append(False)
+        sample['test'][2].append(m)
     return sample
 
+def calc_n50(sequences):
+    """
+    calculate n50 for list of sequences
+    """
+    lengths = sorted([float(len(i)) for i in sequences], reverse = True)
+    total = float(sum(lengths))
+    n = total * float(0.50)
+    n50 = running = lengths[0]
+    for length in lengths:
+        if running >= n:
+            return int(n50)
+        else:
+            n50 = length
+            running += n50
+
 def randomly_fragment(sequence, max_pieces, \
-        alpha = 0.35, beta = 1640, \
-        min_length = 50, max_length = 10000):
+        alpha = 0.1, beta = 100000, \
+        min_length = 1000, max_length = 200000):
     """
     randomly fragment genome and return
     random subset of fragments
@@ -293,11 +314,11 @@ def randomly_fragment(sequence, max_pieces, \
     for fragment in shuffled:
         length = len(fragment)
         if total + length <= max_pieces:
-            subset.extend(fragment)
+            subset.append(fragment)
             total += length
         else:
             diff = max_pieces - total
-            subset.extend(fragment[0:diff])
+            subset.append(fragment[0:diff])
             break
     return subset
 
@@ -314,37 +335,156 @@ def trim_data(data, xy, p = 0.1):
     num = int(length * (p/2))
     return X[num:length - num], Y[num:length - num]
 
+
+def windows2iRep(windows, L, thresholds):
+    """
+    calculate iRep from slide window coverage calculations
+    """
+    # filter zero coverage windows
+    Fwindows = filter_windows(windows)
+    total_windows = len(windows[0])
+    total_Fwindows = len(Fwindows[0])
+    kept_windows = float(total_Fwindows)/float(total_windows)
+    if kept_windows < thresholds['min_wins']:
+        return 'n/a'
+    # log transform
+    x, y = [Fwindows[0], log_trans(Fwindows[1])]
+    y = sorted(y)
+    x, y = trim_data([x, y], xy = True)
+    m, b, r2, info = fit_coverage((x, y, False, False))
+    if r2 < thresholds['min_r2']:
+        return 'n/a'
+    return 2**(m * L) # iRep
+
+def iRep_from_fragments(pars):
+    """
+    calculate irep from random genome fragments
+    """
+
+    # parameters and coverage of complete genome
+    cov, length, p2l, test = pars
+    p, method, window, slide, min_length, max_length, alpha_beta, mask_edges = test
+    alpha, beta = alpha_beta
+    test = 'method:%s window:%s slide:%s min_len:%s max_len:%s a:%s b:%s' \
+                % (method, window, slide, min_length, max_length, alpha, beta)
+    percent = '%s (%s)' % (int(p * 100), p2l[p])
+    results = {'iRep':'n/a', 'n50':None, 'fraction':percent, 'fragments':None, 'method':method, \
+            'window':window, 'slide':slide, 'min_length':min_length, \
+            'mask_edges':mask_edges, 'test':test, 'range':'n/a'}
+
+    # randomly fragment genome
+    L = int(length * p)
+    fragments = randomly_fragment(cov, L, \
+                    min_length = min_length, max_length = max_length, \
+                    alpha = alpha, beta = beta)
+
+    # mask edges
+    if mask_edges is True:
+        fragments = [i[100:len(i)-100] for i in fragments]
+
+    # calc n50 for random fragments
+    results['n50'] = calc_n50(fragments)
+
+    # report number of fragments
+    results['fragments'] = len(fragments)
+    
+    # coverage methods
+
+    ## cat - combine coverage values from fragments, then calculate windows
+    if method == 'iRep':
+        windows = [[], []] # x and y values for windows
+        weights = np.ones(window)
+        fragments = [base for fragment in fragments for base in fragment]
+        if len(fragments) < len(weights):
+            return results
+        x = 1
+        for y in signal.fftconvolve(fragments, weights, 'valid').tolist()[0::slide]:
+            windows[0].append(x)
+            windows[1].append(y/window)
+            x += slide
+        results['iRep'] = windows2iRep(windows, L, thresholds)
+        return results
+
+    ## median - median of 10 iReps using cat method
+    elif method == 'iRep_median':
+        iReps = []
+        for i in range(0, 10):
+            windows = [[], []] # x and y values for windows
+            weights = np.ones(window)
+            random.shuffle(fragments)
+            combined = [base for fragment in fragments for base in fragment]
+            if len(combined) < len(weights):
+                return results
+            x = 1
+            for y in signal.fftconvolve(combined, weights, 'valid').tolist()[0::slide]:
+                windows[0].append(x)
+                windows[1].append(y/window)
+                x += slide
+            iReps.append(windows2iRep(windows, L, thresholds))
+        iReps = [i for i in iReps if i != 'n/a']
+        if len(iReps) == 0:
+            return results
+        results['iRep'] = np.median(iReps)
+        results['range'] = max(iReps) - min(iReps)
+        return results
+
+    ## valid - calculate coverage windows for each fragment, then combine
+    elif method == 'scaffold_windows':
+        windows = [[], []] # x and y values for windows
+        weights = np.ones(window)
+        x = 1
+        for contigCov in fragments:
+            try:
+                for y in signal.fftconvolve(contigCov, weights, 'valid').tolist()[0::slide]:
+                    windows[0].append(x)
+                    windows[1].append(y/window)
+                    x += slide
+            except:
+                windows[0].append(x)
+                windows[1].append(np.average(contigCov))
+                x += slide
+        results['iRep'] = windows2iRep(windows, L, thresholds) 
+        return results
+
+    ## other methods?
+    else:
+        print sys.stderr, '# methods: cat or valid'
+        exit()
+
 def iRep_test(sample, thresholds, threads, n = 100, \
-        fractions = [0.50, 0.75, 0.90]):
+        fraction = [0.75], \
+        method = ['iRep'], \
+        window = [5000], slide = [100], \
+        min_length = [1000], \
+        max_length = [10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000], \
+        alpha_beta = [(0.1, 21000)], \
+        mask_edges = [True]):
     """
     calculate iRep for random subsets of genome
     representing different fractions of the entire genome
     as an approximation for incomplete or draft genomes
     """
     g, s, length, sample = sample
-    X, Y = sample['LTwindows']
-    sample['test'] = [[], []]
-    random_fragments = []
     p2l = {p:'{:,}'.format(int(float(p)*length/1000)) \
-            for p in fractions} # % of genome -> length
-    for p in fractions:
-        windows = int(p * len(X))
+            for p in fraction} # % of genome -> length
+    tests = []
+    for test in product(fraction, method, window, slide, \
+                            min_length, max_length, alpha_beta, mask_edges):
         for i in range(0, n):
-            L = int(length * p)
-            y = sorted(randomly_fragment(Y, windows))
-            dif = float(L)/float(len(y))
-            x = [int(i * dif) + 1 for i, value in enumerate(y, 0)]
-            x, y = trim_data([x, y], xy = True)
-            random_fragments.append((p, L, x, y))
+            tests.append(test)
+    sample['test'] = {'iRep':[], 'n50':[], 'fraction':[], 'fragments':[], 'method':[], \
+            'window':[], 'slide':[], 'min_length':[], 'max_length':[], \
+            'alpha, beta':[], 'mask_edges':[], 'test':[], 'range':[]}
+    # make sure complete genome provided
+    if len(sample['contigs']) != 1:
+        print sys.stderr, '# complete genome required when running tests'
+        exit()
+    cov = [contig for contig in sample['contigs'].values()][0]
     pool = Pool(threads)
-    for m, b, r2, info in pool.map(fit_coverage, \
-            [(x, y, (p, L), False) for p, L, x, y in random_fragments]):
-        if r2 < thresholds['min_r2']:
-            continue
-        p, L = info
-        sample['test'][0].append('%s (%s)' % (int(p * 100), p2l[p]))
-        iRep = 2**(m * L)
-        sample['test'][1].append(iRep)
+    for test_results in pool.map(iRep_from_fragments, \
+            [(cov, length, p2l, test) for test in tests]):
+        for i, result in test_results.items():
+            sample['test'][i].append(result)
     return sample
 
 def plot_tests(genomes, pairs, out, plot, cats, y_lab, normalize = False):
@@ -354,16 +494,20 @@ def plot_tests(genomes, pairs, out, plot, cats, y_lab, normalize = False):
     lengths = []
     slopes = []
     samples = []
+    n50s = []
     for g, s in pairs:
         sample = genomes[g]['samples'][s]
         s = s.rsplit('.', 1)[0].replace('_', ' ')
-        l, m = sample['test']
+        l, n50, m = sample['test']
         lengths.extend(l)
         slopes.extend(m) 
         samples.extend([s for i in m])
+        n50s.extend(n50)
     if normalize == 'log2':
         slopes = log_trans(slopes)
-    slope_fs = pd.DataFrame({cats:lengths, y_lab:slopes, 'sample':samples})
+    slope_fs = pd.DataFrame({cats:lengths, y_lab:slopes, 'sample':samples, 'n50':n50s})
+    slope_fs.to_csv(out, sep = '\t')
+    slope_fs = slope_fs[slope_fs[y_lab] != False]
     sns.set_style('whitegrid')
     sns.set_context('poster')
     sns_plot = sns.boxplot(x = cats, y = y_lab, data = slope_fs, \
@@ -373,6 +517,38 @@ def plot_tests(genomes, pairs, out, plot, cats, y_lab, normalize = False):
             jitter = True, size = 5, edgecolor = 'gray')
     plt.legend(loc = 'upper right', bbox_to_anchor=(1.05, 1))
     sns_plot.figure.savefig('%s' % (plot), bbox_inches = 'tight')
+
+def print_tests(genomes, pairs, out, cats, y_lab, normalize = False):
+    """
+    plot test data
+    """
+    lengths = []
+    slopes = []
+    samples = []
+    n50s = []
+    fragments = []
+    tests = []
+    ranges = []
+    for g, s in pairs:
+        sample = genomes[g]['samples'][s]
+        s = s.rsplit('.', 1)[0]
+        test_results = sample['test']
+        l, n50, num_fragments, m, test, rg = \
+                test_results['fraction'], test_results['n50'], \
+                test_results['fragments'], \
+                test_results['iRep'], test_results['test'], \
+                test_results['range']
+        lengths.extend(l)
+        slopes.extend(m) 
+        samples.extend([s for i in m])
+        n50s.extend(n50)
+        fragments.extend(num_fragments)
+        tests.extend(test)
+        ranges.extend(rg)
+    if normalize == 'log2':
+        slopes = log_trans(slopes)
+    slope_fs = pd.DataFrame({cats:lengths, y_lab:slopes, 'sample':samples, 'n50':n50s, \
+                                'num. fragments':fragments, 'test':tests, 'range':ranges})
     slope_fs.to_csv(out, sep = '\t')
 
 def test_slopes(genomes, pairs, out, plot, test, thresholds, threads):
@@ -384,7 +560,7 @@ def test_slopes(genomes, pairs, out, plot, test, thresholds, threads):
         - test percent of genome required for reliable results
     """
     if test == 'fragments':
-        print >> sys.stderr, '# calculating coverage slope for random fragments of different lengths'
+        print >> sys.stderr, '# calculating coverage slope of random fragments'
         for g, s in pairs:
             genomes[g]['samples'][s] = \
                 fragments_test((g, s, genomes[g]['len'], genomes[g]['samples'][s]), threads)
@@ -394,8 +570,9 @@ def test_slopes(genomes, pairs, out, plot, test, thresholds, threads):
         print >> sys.stderr, '# calculating iRep for random genome subsets'
         for g, s in pairs:
             genomes[g]['samples'][s] = \
-                iRep_test((g, s, genomes[g]['len'], genomes[g]['samples'][s]), thresholds, threads)
-        plot_tests(genomes, pairs, out, plot, \
+                iRep_test((g, s, genomes[g]['len'], genomes[g]['samples'][s]), \
+                    thresholds, threads)
+        print_tests(genomes, pairs, out, \
                 'percent of genome (length in kbp)', 'index of replication (iRep)')
     return genomes
 
@@ -404,8 +581,11 @@ def iRep_calc(sample):
     calculate iRep based on slope of sorted coverage values
     """
     g, s, length, sample, thresholds = sample
-    min_coverage, min_windows, min_r2 = \
-            thresholds['min_cov'], thresholds['min_wins'], thresholds['min_r2']
+    min_coverage, min_windows, min_r2, maxFragMbp = \
+            thresholds['min_cov'], thresholds['min_wins'], thresholds['min_r2'], thresholds['fragMbp']
+
+    # calculate fragments / Mbp
+    sample['fragMbp'] = len(sample['contigs'].keys())/(float(length)/1000000)
 
     X, Y = sample['LTwindows']
 
@@ -440,7 +620,8 @@ def iRep_calc(sample):
     # filter iRep based on window inclusion and coverage thresholds
     if sample['kept_windows'] < min_windows or \
        sample['avg_cov'] < min_coverage or \
-       sample['r2'] < min_r2:
+       sample['r2'] < min_r2 or \
+       sample['fragMbp'] > maxFragMbp:
             sample['fiRep'] = 'n/a'
     else:
         sample['fiRep'] = sample['iRep']
@@ -476,7 +657,7 @@ def filter_windows(win, mdif = float(8)):
         Y.append(y)
     return X, Y
 
-def coverage_windows(sample, window = 10000, slide = 100):
+def coverage_windows(sample, window = 5000, slide = 100):
     """
     sliding window smoothing of coverage data
     # genomes[genome]['samples'][sample]['contigs'][ID] = cov
@@ -510,15 +691,13 @@ def coverage_windows(sample, window = 10000, slide = 100):
     sample['LTwindows'] = [Fwindows[0], log_trans(Fwindows[1])]
     return (g, s, sample)
 
-def calc_cov_windows(genomes, mappings, threads):
+def calc_cov_windows(genomes, pairs, mappings, threads):
     """
     calculate coverage windows for all pairs
     of genomes and samples
     """
     print >> sys.stderr, '# calculating coverage over sliding windows'
     sys.stderr.flush()
-    # generate list of all genomes and samples
-    pairs = [i for i in product(genomes.keys(), [i[0] for i in mappings])]
     # filter out any genome -> sample pairs not passing thresholds
     pairs = [(g, s) for g, s in pairs if s in genomes[g]['samples']]
     pool = Pool(threads)
@@ -605,11 +784,15 @@ def iRep(fastas, id2g, mappings, \
         genomes = parse_genomes_sam(id2g, mappings)
     # get coverage from sam files
     genomes = calc_coverage(genomes, mappings, id2g)
-    # calc coverage windows
-    genomes, pairs = calc_cov_windows(genomes, mappings, threads)
+    # generate list of all genomes and samples
+    pairs = [i for i in product(genomes.keys(), [i[0] for i in mappings])]
+    # filter out any genome -> sample pairs not passing thresholds
+    pairs = [(g, s) for g, s in pairs if s in genomes[g]['samples']]
     if test is not False:
         genomes = test_slopes(genomes, pairs, out, plot, test, thresholds, threads)
         return genomes
+    # calc coverage windows
+    genomes, pairs = calc_cov_windows(genomes, pairs, mappings, threads)
     # calculate per sample slope and estimate growth
     genomes = calc_growth(genomes, pairs, thresholds, threads)
     if out is not False: 
@@ -624,18 +807,20 @@ def print_table(genomes, mappings, out, thresholds):
     """
     print >> sys.stderr, '# saving results'
     samples = [i[0] for i in mappings]
-    iRep, fiRep, r2, cov, kept = [], [], [], [], []
+    iRep, fiRep, r2, cov, kept, fragMbp = [], [], [], [], [], []
     for name, genome in genomes.items():
         iRep.append([])
         fiRep.append([])
         r2.append([])
         cov.append([])
         kept.append([])
+        fragMbp.append([])
         iRep[-1].append(name)
         fiRep[-1].append(name)
         r2[-1].append(name)
         cov[-1].append(name)
         kept[-1].append(name)
+        fragMbp[-1].append(name)
         for sample in samples:
             if sample not in genome['samples']:
                 sample = False
@@ -647,23 +832,26 @@ def print_table(genomes, mappings, out, thresholds):
                 r2[-1].append('n/a')
                 cov[-1].append('n/a')
                 kept[-1].append('n/a')
+                fragMbp[-1].append('n/a') 
             else:
                 iRep[-1].append(sample['iRep'])
                 fiRep[-1].append(sample['fiRep'])
                 r2[-1].append(sample['r2'])
                 cov[-1].append(sample['avg_cov'])
                 kept[-1].append('%.2f' % (100 * sample['kept_windows']))
+                fragMbp[-1].append('%.0f' % (sample['fragMbp']))
     out = open(out, 'w')
     header = ['# genome'] + samples
-    thresholds = 'min cov. = %s, min wins. = %s, min r^2 = %s' % \
-            (thresholds['min_cov'], thresholds['min_wins'], thresholds['min_r2']) 
+    thresholds = 'min cov. = %s, min wins. = %s, min r^2 = %s, max fragments/Mbp = %s' % \
+            (thresholds['min_cov'], thresholds['min_wins'], thresholds['min_r2'], thresholds['fragMbp']) 
     for vals, desc in \
             (fiRep, '## index of replication (iRep) - thresholds: %s' \
                         % (thresholds)), \
             (iRep,  '## index of replication (iRep)'), \
             (r2,   '## r^2'), \
             (cov,  '## coverage'), \
-            (kept, '## % windows passing filter'):
+            (kept, '## % windows passing filter'), \
+            (fragMbp, '## fragments/Mbp'):
         print >> out, desc
         print >> out, '\t'.join(header)
         for i in vals:
@@ -717,7 +905,7 @@ def validate_args(args):
     return args
 
 if __name__ == '__main__':
-    desc = '# est. growth from slope of coverage'
+    desc = '# calculate the Index of Replication (iRep)'
     parser = argparse.ArgumentParser(description = desc)
     parser.add_argument(\
             '-f', nargs = '*', action = 'store', required = False, \
@@ -770,7 +958,7 @@ if __name__ == '__main__':
                 line = line.strip().split('\t')
                 s2bin[line[0]] = line[1]
     # thresholds
-    thresholds = {'min_cov':5, 'min_wins':0.98, 'min_r2':0.90}
+    thresholds = {'min_cov':5, 'min_wins':0.98, 'min_r2':0.90, 'fragMbp':175}
     # calculate iRep
     genomes = iRep(\
                 fastas, s2bin, mappings, \
