@@ -4,6 +4,8 @@ These scripts are described in:
 
 “In situ replication rates for uncultivated bacteria in microbial communities” - Christopher T. Brown, Matthew R. Olm, Brian C. Thomas, Jillian F. Banfield
 
+http://dx.doi.org/10.1101/057992
+
 Scripts require python2.7 and the following packages:
 lmfit
 numpy
