@@ -23,4 +23,7 @@ cPickle
 ### bPTR
 ./bin/bPTR.py -f sample_data/l_gasseri.fna -s sample_data/l_gasseri*sam -o test.bPTR.tsv -plot test.bPTR.pdf -m coverage
 
+### GC Skew
+./bin/gc_skew.py -f sample_data/l_gasseri.fna
+
 Example output is provided in sample_output. 
