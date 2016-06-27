@@ -26,4 +26,4 @@ cPickle
 ### GC Skew
 ./bin/gc_skew.py -f sample_data/l_gasseri.fna
 
-Example output is provided in sample_output. 
+#### Example output is provided in sample_output. 
