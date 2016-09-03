@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 
 """
 script for estimating microbial population replication rates (iRep)
@@ -15,6 +15,7 @@ import lmfit
 import random
 import argparse
 import numpy as np
+import pickle as Pickle
 from scipy import signal
 from itertools import product
 from multiprocessing import Pool
@@ -30,10 +31,12 @@ from matplotlib.backends.backend_pdf import PdfPages
 from mapped import get_reads as mapped
 from fasta import iterate_fasta as parse_fasta
 
-def plot_coverage(cov, trimmed, avg_cov, length, fit, iRep, r2, kept_windows, title):
+def plot_coverage(cov, trimmed, avg_cov, length, fit, iRep, uiRep, r2, kept_windows, title):
     """
     plot coverage profile with fit
     """
+    if len(cov[0]) < 100:
+        return False
     fig, ax1 = plt.subplots()
     # plot coverage data
     ax1.plot(cov[0], cov[1], label = 'filtered', c = '0.75', alpha = 0.5)
@@ -50,12 +53,13 @@ def plot_coverage(cov, trimmed, avg_cov, length, fit, iRep, r2, kept_windows, ti
         ax1.axhline(m * length + b, c = 'r', label = 'Ori/Ter')
         ax1.axhline(b, c = 'r')
     # title
-    plt.suptitle(title, fontsize = 12)
     subtitle = ['iRep: %s' % (iRep), \
+                'un-filtered iRep: %s' % (uiRep), \
                 'r^2: %s' % (r2), \
                 'avg. cov: %s' % (avg_cov), \
                 '%' + ' windows: %s' % (kept_windows)]
-    plt.title('    '.join(subtitle), fontsize = 10)
+    title = title + '\n' + '    '.join(subtitle)
+    plt.suptitle(title, fontsize = 10)
     # label axes
     xlab = 'position (bp)'
     ylab = 'coverage (log2)'
@@ -72,6 +76,78 @@ def plot_coverage(cov, trimmed, avg_cov, length, fit, iRep, r2, kept_windows, ti
     plt.close()
     return fig
 
+def plot_coverage_gc(sample, avg_cov, length, kept_windows, title, show = False):
+    """
+    plot gc bias: cov vs GC fraction
+    """
+    if 'GC' not in sample:
+        return False
+    if 'Cwindows' in sample:
+        fig = plt.figure()
+        ax1 = fig.add_subplot(121)
+    else:
+        fig, ax1 = plt.subplots()
+    GC = sample['GC']
+    COV = sample['Fwindows']
+    if len(GC[0]) < 100:
+        return False
+    # plot cov. vs. gc
+    ax1.plot(GC[1][1::100], COV[1][1::100], \
+            marker = 'o', \
+            label = 'filtered coverage', \
+            c = '0.75', alpha = 1, markersize = 5, linewidth = 0)
+    # plot fit
+    fit = sample['GC fit']
+    if fit is not False:
+        ax1.plot(fit[0], fit[1], \
+                label = 'least squares fit to GC filtered data', \
+                c = 'm', alpha = 0.75, linewidth = 4)
+    # label axes
+    xlab = 'GC content'
+    ylab = 'coverage'
+    ax1.set_ylabel(ylab)
+    ax1.set_xlabel(xlab)
+    # plot cov. vs gc for corrected data
+    if 'Cwindows' in sample:
+        corrected = sample['Cwindows']
+        ax2 = fig.add_subplot(122)
+        ax2.plot(GC[1][1::100], corrected[1][1::100], \
+                    marker = 'o', label = 'corrected', \
+                    c = 'g', alpha = 1, markersize = 5, linewidth = 0)
+        ax2.set_xlabel(xlab)
+        # plot fit to corrected data 
+        Cfit = sample['Cfit']
+        if Cfit is not False:
+            ax2.plot(Cfit[0], Cfit[1], \
+                    label = 'least squares fit to corrected data', \
+                    c = 'm', alpha = 0.75, linewidth = 4)
+    # title
+    iRep = sample['fiRep']
+    if iRep != 'n/a':
+        iRep = '%.2f' % (iRep)
+    if 'raw iRep' in sample:
+        riRep = '%.2f' % (sample['raw iRep'])
+    else:
+        riRep = 'n/a'
+    subtitle = ['iRep: %s' % (iRep), \
+                'raw iRep: %s' % (riRep), \
+                'GC r^2: %.2f' % (sample['GC r2']), \
+                'GC bias: %.2f' % (sample['GC bias']), \
+                'avg. cov: %s' % (avg_cov), \
+                '%' + ' windows: %s' % (kept_windows)]
+    title = title + '\n' + '    '.join(subtitle)
+    plt.suptitle(title, fontsize = 10)
+    # legend
+    ax1.legend(loc = 'upper center', \
+            bbox_to_anchor=(0.5, -0.1), prop = {'size':10})
+    plt.legend(loc = 'upper center', \
+            bbox_to_anchor=(0.5, -0.1), prop = {'size':10})
+    if show is True:
+        plt.show()
+    # save
+    plt.close()
+    return fig
+
 def plot_coverage_hist(cov, avg_cov, iRep, r2, kept_windows, title, bins = 50):
     """
     plot coverage profile with fit
@@ -82,12 +158,12 @@ def plot_coverage_hist(cov, avg_cov, iRep, r2, kept_windows, title, bins = 50):
     plt.ylabel('number of windows')
     plt.xlabel('coverage')
     # title
-    plt.suptitle(title, fontsize = 12)
     subtitle = ['iRep: %s' % (iRep), \
                 'r^2: %s' % (r2), \
                 'avg. cov: %s' % (avg_cov), \
                 '%' + ' windows: %s' % (kept_windows)]
-    plt.title('    '.join(subtitle), fontsize = 10)
+    title = title + '\n' + '    '.join(subtitle)
+    plt.suptitle(title, fontsize = 10)
     # save
     plt.close()
     return fig
@@ -96,12 +172,12 @@ def plot_genomes(genomes, mappings, plot_name):
     """
     plot coverage and fitting data for each genome and sample pair
     """
-    print >> sys.stderr, '# plotting data'
+    print('# plotting data', file=sys.stderr)
     sys.stderr.flush()
     # PDF for plots
     pdf = PdfPages(plot_name)
     sns.set_style('whitegrid')
-    for g_name, genome in genomes.items():
+    for g_name, genome in list(genomes.items()):
         for s_name in [i[0] for i in mappings]:
             if s_name not in genome['samples']:
                 sample = False
@@ -113,9 +189,9 @@ def plot_genomes(genomes, mappings, plot_name):
                     (g_name.rsplit('.', 1)[0], s_name.rsplit('.', 1)[0])
             x, y = sample['windows'][0], sorted(sample['windows'][1])
             # plot coverage histogram
-            stats = [sample['iRep'], sample['r2'], sample['avg_cov']]
+            stats = [sample['fiRep'], sample['iRep'], sample['r2'], sample['avg_cov']]
             stats = ['%.2f' % i if i != 'n/a' else i for i in stats]
-            iRep, r2, avg_cov = stats
+            iRep, uiRep, r2, avg_cov = stats
             kept_windows = sample['kept_windows']
             if kept_windows != 'n/a':
                 kept_windows = '%.2f' % (kept_windows * 100)
@@ -123,11 +199,15 @@ def plot_genomes(genomes, mappings, plot_name):
                     y, avg_cov, iRep, \
                     r2, kept_windows, title)
             pdf.savefig(fig, bbox_inches = 'tight')
+            # plot gc bias with corrected data
+            fig = plot_coverage_gc(sample, avg_cov, genome['len'], kept_windows, title)
+            if fig is not False:
+                pdf.savefig(fig, bbox_inches = 'tight')
             # plot filtered coverage rank with fitting
             fig = plot_coverage(
                     sample['LTwindows'], sample['trimmed'], \
                     avg_cov, genome['len'], sample['fit'], \
-                    iRep, r2, kept_windows, title)
+                    iRep, uiRep, r2, kept_windows, title)
             if fig is not False:
                 pdf.savefig(fig, bbox_inches = 'tight')
     # save PDF
@@ -136,13 +216,14 @@ def plot_genomes(genomes, mappings, plot_name):
 def simple_plot(xy, xy2 = False, horiz = [], title = 'n/a'):
     # plot every 100th coverage window
     x, y = xy
-    plt.plot(x, y, label = 'coverage', c = '0.75') # , marker = 'o')
+    plt.plot(x, y, label = 'coverage', c = 'red') # , marker = 'o')
     if xy2 is not False:
         x2, y2 = xy2
-        plt.plot(x2, y2, label = 'coverage', c = '0.90') # , marker = 'o')
+        plt.plot(x2, y2, label = 'coverage', c = 'blue') # , marker = 'o')
     for i in horiz:
         plt.axvline(x = i)
     plt.title(title)
+    plt.savefig('simple_plot.pdf')
     plt.show()
 
 def calc_coverage(genomes, mappings, id2g, mask_edges = True):
@@ -151,7 +232,7 @@ def calc_coverage(genomes, mappings, id2g, mask_edges = True):
         calcualte coverage at each position in genome
     # genomes[genome]['samples'][sample]['contigs'][ID] = cov
     """
-    print >> sys.stderr, "# parsing mapping files"
+    print("# parsing mapping files", file=sys.stderr)
     sys.stderr.flush()
     for sample, reads in mappings:
         for read in reads:
@@ -165,17 +246,16 @@ def calc_coverage(genomes, mappings, id2g, mask_edges = True):
                             ['contigs'][c][i] += 1
                 except:
                     continue
-    # combine coverage data for contigs
-    for genome in genomes.values():
+    # combine coverage and gc data for contigs
+    for genome in list(genomes.values()):
         order, samples = genome['order'], genome['samples'] 
-        for sample in samples.values():
+        for sample in list(samples.values()):
             for contig in order:
                 try:
                     seq = sample['contigs'][contig]
                     if mask_edges is True:
                         seq = seq[100:len(seq)-100]
                     sample['cov'].extend(seq)
-#                    del sample['contigs'][contig]
                 except:
                     continue
             sample['avg_cov'] = np.average(sample['cov'])
@@ -203,8 +283,8 @@ def coverage_function(pars, X, data = None, printPs = False):
     m = pars['m'].value
     b = pars['b'].value
     if printPs is True:
-        print 'm: %s b: %s' % \
-            ('{:,}'.format(int(m)), '{:,}'.format(int(b)))
+        print('m: %s b: %s' % \
+            ('{:,}'.format(int(m)), '{:,}'.format(int(b))))
     results = [float(m * x) + b for x in X]
     if data is None:
         return np.asarray(results)
@@ -250,7 +330,7 @@ def fragments_test(sample, threads, n = 100, \
     for l in lengths:
         if l >= length:
             continue
-        possible_starts = range(0, length - l - 1)
+        possible_starts = list(range(0, length - l - 1))
         for i in range(0, n):
             start = random.choice(possible_starts)
             end = start + l
@@ -368,7 +448,8 @@ def iRep_from_fragments(pars):
     test = 'method:%s window:%s slide:%s min_len:%s max_len:%s a:%s b:%s' \
                 % (method, window, slide, min_length, max_length, alpha, beta)
     percent = '%s (%s)' % (int(p * 100), p2l[p])
-    results = {'iRep':'n/a', 'n50':None, 'fraction':percent, 'fragments':None, 'method':method, \
+    results = {'iRep':'n/a', 'n50':None, 'fraction':percent, \
+            'fragments':None, 'method':method, \
             'window':window, 'slide':slide, 'min_length':min_length, \
             'mask_edges':mask_edges, 'test':test, 'range':'n/a'}
 
@@ -387,7 +468,7 @@ def iRep_from_fragments(pars):
 
     # report number of fragments
     results['fragments'] = len(fragments)
-    
+
     # coverage methods
 
     ## cat - combine coverage values from fragments, then calculate windows
@@ -448,7 +529,7 @@ def iRep_from_fragments(pars):
 
     ## other methods?
     else:
-        print sys.stderr, '# methods: cat or valid'
+        print(sys.stderr, '# methods: cat or valid')
         exit()
 
 def iRep_test(sample, thresholds, threads, n = 100, \
@@ -477,13 +558,13 @@ def iRep_test(sample, thresholds, threads, n = 100, \
             'alpha, beta':[], 'mask_edges':[], 'test':[], 'range':[]}
     # make sure complete genome provided
     if len(sample['contigs']) != 1:
-        print sys.stderr, '# complete genome required when running tests'
+        print(sys.stderr, '# complete genome required when running tests')
         exit()
-    cov = [contig for contig in sample['contigs'].values()][0]
+    cov = [contig for contig in list(sample['contigs'].values())][0]
     pool = Pool(threads)
     for test_results in pool.map(iRep_from_fragments, \
             [(cov, length, p2l, test) for test in tests]):
-        for i, result in test_results.items():
+        for i, result in list(test_results.items()):
             sample['test'][i].append(result)
     return sample
 
@@ -560,14 +641,14 @@ def test_slopes(genomes, pairs, out, plot, test, thresholds, threads):
         - test percent of genome required for reliable results
     """
     if test == 'fragments':
-        print >> sys.stderr, '# calculating coverage slope of random fragments'
+        print('# calculating coverage slope of random fragments', file=sys.stderr)
         for g, s in pairs:
             genomes[g]['samples'][s] = \
                 fragments_test((g, s, genomes[g]['len'], genomes[g]['samples'][s]), threads)
         plot_tests(genomes, pairs, out, plot, \
                 'fragment length (percent of genome)', 'log2(slope)', normalize = 'log2')
     if test == 'iRep':
-        print >> sys.stderr, '# calculating iRep for random genome subsets'
+        print('# calculating iRep for random genome subsets', file=sys.stderr)
         for g, s in pairs:
             genomes[g]['samples'][s] = \
                 iRep_test((g, s, genomes[g]['len'], genomes[g]['samples'][s]), \
@@ -576,18 +657,14 @@ def test_slopes(genomes, pairs, out, plot, test, thresholds, threads):
                 'percent of genome (length in kbp)', 'index of replication (iRep)')
     return genomes
 
-def iRep_calc(sample):
+def iRep_from_windows(X, Y, length, sample, thresholds):
     """
-    calculate iRep based on slope of sorted coverage values
+    calculate iRep from coverage windows
     """
-    g, s, length, sample, thresholds = sample
+    # thresholds
     min_coverage, min_windows, min_r2, maxFragMbp = \
-            thresholds['min_cov'], thresholds['min_wins'], thresholds['min_r2'], thresholds['fragMbp']
-
-    # calculate fragments / Mbp
-    sample['fragMbp'] = len(sample['contigs'].keys())/(float(length)/1000000)
-
-    X, Y = sample['LTwindows']
+            thresholds['min_cov'], thresholds['min_wins'], \
+            thresholds['min_r2'], thresholds['fragMbp']
 
     # sort coverage windows
     Ys = sorted(Y)
@@ -597,7 +674,7 @@ def iRep_calc(sample):
         sample['trimmed'] = False
     else:
         dif = float(length)/float(windows)
-        Xs = [int(i * dif) + 1 for i, value in enumerate(Ys, 0)] 
+        Xs = [int(i * dif) + 1 for i, value in enumerate(Ys, 0)]
 
         # trim ends of sorted data
         Xt, Yt = trim_data((Xs, Ys), xy = True)
@@ -610,8 +687,8 @@ def iRep_calc(sample):
         sample['r2'] = 'n/a'
         sample['iRep'] = 'n/a'
         sample['fiRep'] = 'n/a'
-        return g, s, sample
-    
+        return sample
+
     iRep = 2**(m * length)
     sample['iRep'] = iRep
     sample['fit'] = fit, m, b
@@ -626,43 +703,76 @@ def iRep_calc(sample):
     else:
         sample['fiRep'] = sample['iRep']
 
+    return sample
+
+def iRep_calc(sample):
+    """
+    calculate iRep based on slope of sorted coverage values
+    """
+    g, s, length, sample, thresholds = sample
+
+    # calculate fragments / Mbp
+    sample['fragMbp'] = len(list(sample['contigs'].keys()))/(float(length)/1000000)
+
+    # calculate iRep for un-corrected data
+    if 'OLTwindows' in sample:
+        X, Y = sample['OLTwindows']
+        sample['raw iRep'] = iRep_from_windows(X, Y, length, sample, thresholds)['iRep']
+
+    # calculate iRep
+    X, Y = sample['LTwindows']
+    sample = iRep_from_windows(X, Y, length, sample, thresholds)
+
     return g, s, sample
 
 def calc_growth(genomes, pairs, thresholds, threads):
     """
     estimate growth from slope of sorted (filtered) coverage windows
     """
-    print >> sys.stderr, '# calculating coverage slope and index of replication (iRep)'
+    print('# calculating coverage slope and index of replication (iRep)', file=sys.stderr)
     sys.stderr.flush()
     pool = Pool(threads)
     for g, s, sample in pool.map(iRep_calc, \
-            [(g, s, genomes[g]['len'], genomes[g]['samples'][s], thresholds) 
+            [(g, s, genomes[g]['len'], genomes[g]['samples'][s], thresholds)
                 for g, s in pairs]):
         genomes[g]['samples'][s] = sample
     pool.terminate()
     return genomes
 
-def filter_windows(win, mdif = float(8)):
+def filter_windows(win, other = False, mdif = float(8)):
     """
     filter windows based on difference from median
     """
     X, Y = [], []
     med = np.median(win[1])
-    for x, y in zip(win[0], win[1]):
-        if y <= 0 or med <= 0:
-            continue
-        if abs(float(max([y, med])) / float(min([y, med]))) > mdif:
-            continue
-        X.append(x)
-        Y.append(y)
-    return X, Y
+    if other is False:
+        for x, y in zip(win[0], win[1]):
+            if y <= 0 or med <= 0:
+                continue
+            if abs(float(max([y, med])) / float(min([y, med]))) > mdif:
+                continue
+            X.append(x)
+            Y.append(y)
+        return X, Y
+    else:
+        oX, oY = [], []
+        for x, y, ox, oy in zip(win[0], win[1], other[0], other[1]):
+            if y <= 0 or med <= 0:
+                continue
+            if abs(float(max([y, med])) / float(min([y, med]))) > mdif:
+                continue
+            X.append(x)
+            Y.append(y)
+            oX.append(ox)
+            oY.append(oy)
+        return [X, Y], [oX, oY]
 
 def coverage_windows(sample, window = 5000, slide = 100):
     """
     sliding window smoothing of coverage data
     # genomes[genome]['samples'][sample]['contigs'][ID] = cov
     """
-    g, s, sample = sample
+    g, gc, s, sample, gc_correction, thresholds = sample
     # calculate coverage windows for sample
     cov = sample['cov']
     del sample['cov']
@@ -674,6 +784,7 @@ def coverage_windows(sample, window = 5000, slide = 100):
         sample['kept_windows'] = False
         sample['LTwindows'] = False
         sample['iRep'] = 'n/a'
+        sample['GC bias'] = 'n/a'
         sample['fiRep'] = 'n/a'
         sample['fit'] = False
         return (g, s, sample)
@@ -683,20 +794,37 @@ def coverage_windows(sample, window = 5000, slide = 100):
         i += slide
     # filter zero coverage windows
     sample['windows'] = windows
-    Fwindows = filter_windows(windows)
+    if gc is not False:
+        Fwindows, Fgc = filter_windows(windows, gc)
+        sample['GC'] = Fgc
+        sample['Fwindows'] = Fwindows # only need this for plotting GC data
+    else:
+        Fwindows = filter_windows(windows)
     total_windows = len(windows[0])
     total_Fwindows = len(Fwindows[0])
     sample['kept_windows'] = float(total_Fwindows)/float(total_windows)
+    # calculate gc bias
+    if gc is not False:
+        fit, filtered, corrected_windows, Cfit = \
+                gc_bias(Fgc, Fwindows, thresholds['GC_min_r2'])
+        fit, m, b, r2 = fit
+        sample['GC fit'], sample['GC r2'] = fit, r2
+        sample['GC bias'] = m * r2
+        if gc_correction is True and corrected_windows is not False:
+            sample['Cwindows'] = corrected_windows
+            sample['Cfit'] = Cfit
+            sample['OLTwindows'] = [Fwindows[0], log_trans(Fwindows[1])]
+            Fwindows = corrected_windows
     # log transform
     sample['LTwindows'] = [Fwindows[0], log_trans(Fwindows[1])]
     return (g, s, sample)
 
-def calc_cov_windows(genomes, pairs, mappings, threads):
+def calc_cov_windows(genomes, pairs, mappings, gc_correction, thresholds, threads):
     """
     calculate coverage windows for all pairs
     of genomes and samples
     """
-    print >> sys.stderr, '# calculating coverage over sliding windows'
+    print('# calculating coverage over sliding windows', file=sys.stderr)
     sys.stderr.flush()
     # filter out any genome -> sample pairs not passing thresholds
     pairs = [(g, s) for g, s in pairs if s in genomes[g]['samples']]
@@ -704,7 +832,8 @@ def calc_cov_windows(genomes, pairs, mappings, threads):
     # calculate coverage windows for each pair
     for sample in \
             pool.map(coverage_windows, \
-            [[g, s, genomes[g]['samples'][s]] for g, s in pairs]):
+            [[g, genomes[g]['gc'], s, genomes[g]['samples'][s], gc_correction, thresholds]\
+                for g, s in pairs]):
         g, s, sample = sample
         genomes[g]['samples'][s] = sample
     pool.terminate()
@@ -712,7 +841,63 @@ def calc_cov_windows(genomes, pairs, mappings, threads):
     pairs = [(g, s) for g, s in pairs if genomes[g]['samples'][s]['windows'] is not False]
     return genomes, pairs
 
-def parse_genomes_fa(fastas, mappings):
+def gc_bias(GC, COV, correction_threshold):
+    """
+    calculate GC bias by fitting line to cov vs %s gc
+    """
+    # fit line to cov vs gc
+    m, b, fit, r2, l = fit_coverage((GC[1], COV[1], False, True))
+    # remove outliers
+    fGC, fCOV, error = [], [], []
+    for gc, cov in zip(GC[1], COV[1]):
+        est = m * gc + b
+        error.append(abs(cov - est))
+    try:
+        cutoff = sorted(error, reverse = True)[int(len(error)*0.01)]
+    except:
+        cutoff = 0
+    for gc, cov, e in zip(GC[1], COV[1], error):
+        if e >= cutoff:
+            continue
+        fGC.append(gc)
+        fCOV.append(cov)
+    # re-fit with filtered data
+    m, b, fit, r2, l = fit_coverage((fGC, fCOV, False, True))
+    if r2 < correction_threshold:
+        return (fit, m, b, r2), (fGC, fCOV), False, False
+    corrected = [[], []]
+    av = np.average(COV[1])
+    for p, gc, cov in zip(GC[0], GC[1], COV[1]):
+        est = m * gc + b
+        correction = av - est
+        corrected[0].append(p)
+        corrected[1].append(cov + correction)
+    Cm, Cb, Cfit, Cr2, Cl = fit_coverage((fGC, corrected[1], False, True))
+    return (fit, m, b, r2), [fGC, fCOV], corrected, Cfit
+
+def gc_content(seq, window = 5000, slide = 100):
+    """
+    calculate gc content over sequence windows
+    """
+    # convert GC
+    replacements = {'G':1, 'C':1, 'A':0, 'T':0, 'N':0}
+    GC = [] # G - C
+    for base in seq:
+        try:
+            GC.append(replacements[base.upper()])
+        except:
+            GC.append(0)
+    # calculate gc content over sliding windows
+    i = 0
+    weights = np.ones(window)
+    GCwindows = [[], []]
+    for gc in signal.fftconvolve(GC, weights, 'valid').tolist()[0::slide]:
+        GCwindows[0].append(i)
+        GCwindows[1].append(gc/window)
+        i += slide
+    return GCwindows
+
+def parse_genomes_fa(fastas, mappings, mask_edges = True):
     """
     genomes[genome name] = {order: [contig order], samples: {}}
         samples[sample name] = {cov: [coverage by position], contigs: {}}
@@ -725,15 +910,22 @@ def parse_genomes_fa(fastas, mappings):
         samples = {s[0]:{'contigs':{}, 'cov':[]} for s in mappings}
         g = genomes[name] = {'order':[], 'samples':samples}
         g['len'] = 0
+        genome_seq = []
         for seq in parse_fasta(genome): 
             ID = seq[0].split('>', 1)[1].split()[0]
             g['order'].append(ID)
             id2g[ID] = name
             length = len(seq[1])
             g['len'] += length
-            for sample in samples.keys():
+            if mask_edges is True:
+                contig_seq = seq[1][100:len(seq[1])-100]
+            else:
+                contig_seq = seq[1]
+            genome_seq.extend(contig_seq)
+            for sample in list(samples.keys()):
                 g['samples'][sample]['contigs'][ID] = \
                     [0 for i in range(0, length)]
+        g['gc'] = gc_content(genome_seq)
     return genomes, id2g
 
 def parse_genomes_sam(id2g, mappings):
@@ -756,7 +948,7 @@ def parse_genomes_sam(id2g, mappings):
                 continue
             name = id2g[ID]
             if name not in genomes:
-                genomes[name] = {'order':[], 'samples':{}, 'len': 0}
+                genomes[name] = {'order':[], 'samples':{}, 'len': 0, 'gc':False}
             if ID not in genomes[name]['order']:
                 genomes[name]['order'].append(ID)
                 genomes[name]['len'] += length
@@ -766,14 +958,14 @@ def parse_genomes_sam(id2g, mappings):
             genomes[name]['samples'][sam]['contigs'][ID] = [0 for i in range(0, length)]
     return genomes
 
-def iRep(fastas, id2g, mappings, \
-                        out, plot, test, thresholds, threads):
+def iRep(fastas, id2g, mappings, out, pickle, plot, \
+            test, thresholds, gc_correction, threads):
     """
     est. growth from slope of coverage
      1) calculate coverage over windows
      2) sort and filter coverage window calculations
-     3) calculate slope of sorted coverage values 
-        - fitting line to sorted/filtered coverage 
+     3) calculate slope of sorted coverage values
+        - fitting line to sorted/filtered coverage
            using Levenberg-Marquardt algorithm (least squares)
      4) approximate growth from length-normalized slope
     """
@@ -782,45 +974,66 @@ def iRep(fastas, id2g, mappings, \
         genomes, id2g = parse_genomes_fa(fastas, mappings)
     else:
         genomes = parse_genomes_sam(id2g, mappings)
+        
     # get coverage from sam files
     genomes = calc_coverage(genomes, mappings, id2g)
+
     # generate list of all genomes and samples
-    pairs = [i for i in product(genomes.keys(), [i[0] for i in mappings])]
+    pairs = [i for i in product(list(genomes.keys()), [i[0] for i in mappings])]
+
     # filter out any genome -> sample pairs not passing thresholds
     pairs = [(g, s) for g, s in pairs if s in genomes[g]['samples']]
     if test is not False:
         genomes = test_slopes(genomes, pairs, out, plot, test, thresholds, threads)
         return genomes
+
     # calc coverage windows
-    genomes, pairs = calc_cov_windows(genomes, pairs, mappings, threads)
+    genomes, pairs = \
+            calc_cov_windows(genomes, pairs, mappings, gc_correction, thresholds, threads)
+
     # calculate per sample slope and estimate growth
     genomes = calc_growth(genomes, pairs, thresholds, threads)
-    if out is not False: 
+    
+    # save results
+    if out is not False:
         print_table(genomes, mappings, out, thresholds)
-    if args['plot'] is not False:
-        plot_genomes(genomes, mappings, args['plot'])
+    if pickle is not False:
+        pickle_out = '%s.pickle' % (out.rsplit('.', 1)[0])
+        pickle_out = open(pickle_out, 'wb')
+        Pickle.dump(genomes, pickle_out)
+        pickle_out.close()
+    if plot is not False:
+        plot_genomes(genomes, mappings, plot)
+
     return genomes
 
 def print_table(genomes, mappings, out, thresholds):
     """
     print table of results
     """
-    print >> sys.stderr, '# saving results'
+    print('# saving results', file=sys.stderr)
     samples = [i[0] for i in mappings]
-    iRep, fiRep, r2, cov, kept, fragMbp = [], [], [], [], [], []
-    for name, genome in genomes.items():
+    iRep, fiRep, riRep, r2, cov, kept, fragMbp, gcb, gcr2 = \
+            [], [], [], [], [], [], [], [], []
+    for name, genome in list(genomes.items()):
         iRep.append([])
         fiRep.append([])
+        riRep.append([])
         r2.append([])
         cov.append([])
         kept.append([])
         fragMbp.append([])
+        gcb.append([])
+        gcr2.append([])
         iRep[-1].append(name)
         fiRep[-1].append(name)
+        riRep[-1].append(name)
         r2[-1].append(name)
         cov[-1].append(name)
         kept[-1].append(name)
         fragMbp[-1].append(name)
+        gcb[-1].append(name)
+        gcr2[-1].append(name)
         for sample in samples:
             if sample not in genome['samples']:
                 sample = False
@@ -829,40 +1042,55 @@ def print_table(genomes, mappings, out, thresholds):
             if sample is False:
                 iRep[-1].append('n/a')
                 fiRep[-1].append('n/a')
+                riRep[-1].append('n/a')
                 r2[-1].append('n/a')
                 cov[-1].append('n/a')
                 kept[-1].append('n/a')
-                fragMbp[-1].append('n/a') 
+                fragMbp[-1].append('n/a')
+                gcb[-1].append('n/a')
+                gcr2[-1].append('n/a')
             else:
                 iRep[-1].append(sample['iRep'])
                 fiRep[-1].append(sample['fiRep'])
+                try:
+                    riRep[-1].append(sample['raw iRep'])
+                except:
+                    riRep[-1].append('n/a')
                 r2[-1].append(sample['r2'])
                 cov[-1].append(sample['avg_cov'])
                 kept[-1].append('%.2f' % (100 * sample['kept_windows']))
                 fragMbp[-1].append('%.0f' % (sample['fragMbp']))
+                gcb[-1].append(sample['GC bias'])
+                try:
+                    gcr2[-1].append(sample['GC r2'])
+                except:
+                    gcr2[-1].append('n/a')
     out = open(out, 'w')
     header = ['# genome'] + samples
-    thresholds = 'min cov. = %s, min wins. = %s, min r^2 = %s, max fragments/Mbp = %s' % \
-            (thresholds['min_cov'], thresholds['min_wins'], thresholds['min_r2'], thresholds['fragMbp']) 
+    thresholds = 'min cov. = %s, min wins. = %s, min r^2 = %s, max fragments/Mbp = %s, GC correction min r^2 = %s' % \
+            (thresholds['min_cov'], thresholds['min_wins'], thresholds['min_r2'], \
+            thresholds['fragMbp'], thresholds['GC_min_r2'])
     for vals, desc in \
-            (fiRep, '## index of replication (iRep) - thresholds: %s' \
-                        % (thresholds)), \
-            (iRep,  '## index of replication (iRep)'), \
+            (fiRep, '## index of replication (iRep) - thresholds: %s' % (thresholds)), \
+            (iRep,  '## un-filtered index of replication (iRep)'), \
+            (riRep, '## raw index of replication (no GC bias correction)'), \
             (r2,   '## r^2'), \
             (cov,  '## coverage'), \
             (kept, '## % windows passing filter'), \
-            (fragMbp, '## fragments/Mbp'):
-        print >> out, desc
-        print >> out, '\t'.join(header)
+            (fragMbp, '## fragments/Mbp'), \
+            (gcb, '## GC bias'), \
+            (gcr2, '## GC r^2'):
+        print(desc, file=out)
+        print('\t'.join(header), file=out)
         for i in vals:
-            print >> out, '\t'.join([str(j) for j in i])
-        print >> out, '#'
+            print('\t'.join([str(j) for j in i]), file=out)
+        print('#', file=out)
     out.close()
     return out
 
 def open_files(files):
     """
-    open files in list, use stdin if first 
+    open files in list, use stdin if first
     item in list is '-'
     """
     if files is None:
@@ -885,7 +1113,7 @@ def validate_args(args):
     check that arguments are supplied correctly
     """
     if args['f'] is None and args['b'] is None:
-        print >> sys.stderr, '# -f or -b is required (-h for help)'
+        print('# -f or -b is required (-h for help)', file=sys.stderr)
         exit()
     # check if files already exist
     args['plot'] = '%s.pdf' % (args['o'])
@@ -895,13 +1123,16 @@ def validate_args(args):
         if i is not False and os.path.isfile(i) and args['ff'] is False:
             found.append(i)
     if len(found) > 0:
-        print >> sys.stderr, '# file(s): %s already exist. Use -ff to overwrite.' \
-                % (', '.join(found))
+        print('# file(s): %s already exist. Use -ff to overwrite.' \
+                % (', '.join(found)), file=sys.stderr)
         exit()
     if args['test'] is not False:
         if args['test'] != 'fragments' and args['test'] != 'iRep':
-            print >> sys.stderr, '# test methods include: fragments or iRep'
+            print('# test methods include: fragments or iRep', file=sys.stderr)
             exit()
+    if args['f'] is None and args['gc_correction'] is True:
+        print('# -f requred for % GC correction', file=sys.stderr)
+        exit()
     return args
 
 if __name__ == '__main__':
@@ -920,6 +1151,9 @@ if __name__ == '__main__':
             '-o', required = True, type = str, \
             help = 'prefix for output files (table and plots)')
     parser.add_argument(\
+            '--pickle', action = 'store_true', \
+            help = 'save pickle file')
+    parser.add_argument(\
             '-mm', required = False, default = False, type = int, \
             help = 'max. # of read mismatches allowed (default: no limit)')
     parser.add_argument(\
@@ -934,6 +1168,9 @@ if __name__ == '__main__':
     parser.add_argument(\
             '--no-plot', action = 'store_true', \
             help = 'do not plot output')
+    parser.add_argument(\
+            '--no-gc-correction', action = 'store_false', \
+            help = 'do not correct coverage for GC bias before calculating iRep')
     parser.add_argument(\
             '-ff', action = 'store_true', \
             help = 'overwrite files')
@@ -958,9 +1195,10 @@ if __name__ == '__main__':
                 line = line.strip().split('\t')
                 s2bin[line[0]] = line[1]
     # thresholds
-    thresholds = {'min_cov':5, 'min_wins':0.98, 'min_r2':0.90, 'fragMbp':175}
+    thresholds = {'min_cov':5, 'min_wins':0.98, 'min_r2':0.90, \
+                    'fragMbp':175, 'GC_min_r2':0.0}
     # calculate iRep
     genomes = iRep(\
                 fastas, s2bin, mappings, \
-                args['table'], args['plot'], args['test'], \
-                thresholds, args['t'])
+                args['table'], args['pickle'], args['plot'], args['test'], \
+                thresholds, args['no_gc_correction'], args['t'])

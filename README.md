@@ -6,7 +6,7 @@ These scripts are described in:
 
 http://dx.doi.org/10.1101/057992
 
-Scripts require python2.7 and the following packages:
+Scripts require python3 and the following packages:
 lmfit
 numpy
 scipy

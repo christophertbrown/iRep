@@ -1,10 +1,7 @@
-#!/usr/bin/python2.7
+#!/usr/bin/env python3
 
 """
 script for sorting and filtering a sam file
-
-Chris Brown
-ctb@berkeley.edu
 """
 
 import sys
@@ -110,7 +107,7 @@ def check_region(read, pair, region):
 def reads_from_mapping(mapping, contigs, mismatches, mm_option, req_map, region):
     c = cycle([1, 2])
     for line in mapping:
-        line = line.strip().split()
+        line = line.strip().split('\t')
         if line[0].startswith('@'): # get the sam header
             if line[0].startswith('@SQ'):
                 contig = line[1].split('SN:', 1)[1]
@@ -130,7 +127,7 @@ def reads_from_mapping(mapping, contigs, mismatches, mm_option, req_map, region)
                     yield [1, sam2fastq(line)]
                     yield [10, line]
         else:
-            n = c.next()
+            n = next(c)
             if n == 2:
                 if contigs is False:
                     if prev[2] != '*' or line[2] != '*':
@@ -205,7 +202,7 @@ if __name__ == '__main__':
     args = vars(parser.parse_args())
     # is -o or -r specified? If not, script won't output anything
     if args['o'] is False and args['r'] is False:
-        print '# specify -o and/or -r'
+        print('# specify -o and/or -r')
         exit()
     sam, contigs, mismatches, mm_option, new_sam = args['s'], args['f'], args['m'], args['p'], args['o']
     print_reads, sort_sam, req_map = args['r'], args['sort'], args['require_mapping']
@@ -214,7 +211,7 @@ if __name__ == '__main__':
     # convert region to list
     if region is not False:
         if '-' not in region:
-            print '# specify range with -c (e.g. 1-500)'
+            print('# specify range with -c (e.g. 1-500)')
             exit()
         region = [int(i) for i in region.split('-')]
     if mismatches == 'False' or mismatches == 'FALSE' or mismatches == 'false':
@@ -224,8 +221,8 @@ if __name__ == '__main__':
     else:
         mismatches = int(mismatches)
         if mm_option != 'one' and mm_option != 'both':
-            print >> sys.stderr, '# specify one or both for mismatch option'
-            print >> sys.stderr, '# i.e. should the mismatches threshold apply to one or both reads in a pair?'
+            print('# specify one or both for mismatch option', file=sys.stderr)
+            print('# i.e. should the mismatches threshold apply to one or both reads in a pair?', file=sys.stderr)
             exit()
     if contigs == '-':
         contigs = [i.strip() for i in sys.stdin]
@@ -234,11 +231,11 @@ if __name__ == '__main__':
     for type, read in get_reads(sam, contigs, mismatches, mm_option, sort_sam, req_map, region, sbuffer):
         if type == 1:
             if print_reads is True:
-                print >> sys.stderr, '\n'.join(read)
+                print('\n'.join(read), file=sys.stderr)
         elif type == 2:
             if print_reads is True:
-                print '\n'.join(read)
+                print('\n'.join(read))
         elif new_sam is not False and (type == 0 or type == 10 or type == 20):
-            print >> new_sam, '\t'.join(read)
+            print('\t'.join(read), file=new_sam)
     if new_sam is not False:
         new_sam.close()

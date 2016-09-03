@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 
 """
 script for estimating growth rate from peak-to-trough coverage ratios
@@ -16,7 +16,7 @@ import argparse
 import numpy as np
 from scipy import signal
 from scipy import ndimage
-import cPickle as pickle
+import pickle as pickle
 from itertools import product
 import matplotlib.pyplot as plt
 from multiprocessing import Pool
@@ -91,7 +91,7 @@ def plot_genomes(genomes, plot_name):
     if '.pdf' not in plot_name:
         plot_name = '%s.pdf' % (plot_name)
     pdf = PdfPages(plot_name)
-    for g_name, genome in genomes.items():
+    for g_name, genome in list(genomes.items()):
         if 'c_skew' in genome:
             c_skew = genome['c_skew']
         else:
@@ -105,7 +105,7 @@ def plot_genomes(genomes, plot_name):
                 fit = False
             # plot coverage
             y = sample['cov']
-            x = range(0, len(y))
+            x = list(range(0, len(y)))
             fig = plot_coverage([x, y], 'coverage', \
                     sample['avg_cov'], False, c_skew, \
                     genome['ORI'], genome['TER'], None, \
@@ -150,9 +150,9 @@ def calc_coverage(genomes, mappings, id2g):
                 except:
                     continue
     # combine coverage data for contigs
-    for genome in genomes.values():
+    for genome in list(genomes.values()):
         order, samples = genome['order'], genome['samples'] 
-        for sample in samples.values():
+        for sample in list(samples.values()):
             for contig in order:
                 sample['cov'].extend(sample['contigs'][contig])
                 del sample['contigs'][contig]
@@ -173,8 +173,8 @@ def coverage_function(pars, X, data = None, printPs = False):
     else:
         a = float(y1 - y2) / float(x1 - x2)
     if printPs is True:
-        print 'x1: %s x2: %s y1: %s y2: %s a:%s' \
-                % ('{:,}'.format(int(x1)), '{:,}'.format(int(x2)), y1, y2, a)
+        print('x1: %s x2: %s y1: %s y2: %s a:%s' \
+                % ('{:,}'.format(int(x1)), '{:,}'.format(int(x2)), y1, y2, a))
     for x in X:
         if x <= x1:
             results.append(-1*a*x + y1 + a*x1)
@@ -373,7 +373,7 @@ def ori_from_cov(sample, error_threshold = 20000):
     g, s, length, sample = sample
     if sample['filtered'] is False:
         y = sample['cov']
-        x = range(0, len(y))
+        x = list(range(0, len(y)))
         sample['m_filter'] = [x, median_filter(y)]
         return g, s, sample
     x, y = sample['filtered']
@@ -416,10 +416,10 @@ def sample_ptr_from_coverage(genomes, mappings, perms, threads, ptr_threshold = 
     # calculate cumulative gc skew for each genome
     pool = Pool(threads)
     for name, ori, ter, c_skew in \
-        pool.map(calc_gc_skew, [g for g in genomes.items()]):
+        pool.map(calc_gc_skew, [g for g in list(genomes.items())]):
             genomes[name]['c_skew'] = c_skew
     # generate list of all genomes and samples
-    pairs = product(genomes.keys(), [i[0] for i in mappings])
+    pairs = product(list(genomes.keys()), [i[0] for i in mappings])
     # remove samples with no coverage, also get genome length
     pairs = [(g, s, genomes[g]['len']) for g, s in pairs \
             if genomes[g]['samples'][s] is not False]
@@ -432,9 +432,9 @@ def sample_ptr_from_coverage(genomes, mappings, perms, threads, ptr_threshold = 
                 for g, s, l in pairs]):
         g, s, sample = sample
         genomes[g]['samples'][s] = sample
-    for genome in genomes.values():
+    for genome in list(genomes.values()):
         length = genome['len']
-        for sample in genome['samples'].values():
+        for sample in list(genome['samples'].values()):
             if sample['filtered'] is False:
                 continue
             x, y = sample['filtered']
@@ -472,13 +472,13 @@ def ori_from_gc_skew(genomes, mapping, threads):
     # find ori and ter for each genome based on gc skew
     pool = Pool(threads)
     for name, ori, ter, c_skew in \
-        pool.map(calc_gc_skew, [g for g in genomes.items()]):
+        pool.map(calc_gc_skew, [g for g in list(genomes.items())]):
             genomes[name]['c_skew'] = c_skew
             genomes[name]['ORI'] = [ori]
             genomes[name]['TER'] = [ter]
     # generate list of all genomes and samples
     pool = Pool(threads)
-    pairs = product(genomes.keys(), [i[0] for i in mappings])
+    pairs = product(list(genomes.keys()), [i[0] for i in mappings])
     # calculate median coverage filter for each genome and sample pair
     for sample in \
         pool.map(median_filter_names, \
@@ -515,7 +515,7 @@ def calc_ptr(genomes, min_samples = 1):
      locations re-calculated based on the circular median of Ori and Ter 
      positions determined across samples
     """
-    for genome in genomes.values():
+    for genome in list(genomes.values()):
         # define consensus Ori and Ter based on circular median of
         # Ori and Ter determined from each sample
         ORI, TER = genome['ORI'], genome['TER']
@@ -528,7 +528,7 @@ def calc_ptr(genomes, min_samples = 1):
         genome['TER'] = TERx
         # calculate ptr for each genome and sample based
         # on consensus Ori/Ter locations
-        for name, sample in genome['samples'].items():
+        for name, sample in list(genome['samples'].items()):
             if sample is False:
                 continue
             # check for passing significance threshold
@@ -605,7 +605,7 @@ def calc_cov_windows(genomes, mappings, threads):
     of genomes and samples
     """
     # generate list of all genomes and samples
-    pairs = product(genomes.keys(), [i[0] for i in mappings])
+    pairs = product(list(genomes.keys()), [i[0] for i in mappings])
     pool = Pool(threads)
     # calculate coverage windows for each pair
     for sample in \
@@ -638,7 +638,7 @@ def parse_genomes(fastas, mappings):
             length = len(seq[1])
             g['len'] += length
             cov = [0 for i in range(0, length)]
-            for sample in samples.keys():
+            for sample in list(samples.keys()):
                 g['samples'][sample]['contigs'][ID] = \
                 [0 for i in range(0, length)]
         g['seq'] = sequence
@@ -670,7 +670,7 @@ def growth_from_ptr(fastas, mappings, out, pickle_in, pickle_out, \
         elif method == 'gc_skew':
             genomes = ori_from_gc_skew(genomes, mappings, threads)
         else: 
-            print >> sys.stderr, '# specify method: gc_skew or coverage'
+            print('# specify method: gc_skew or coverage', file=sys.stderr)
             exit()
         # calculate ptr based on ori, ter calculated across samples
         genomes = calc_ptr(genomes)
@@ -689,13 +689,13 @@ def print_table(genomes, out):
     print table of results
     """
     samples = []
-    for g in genomes.values():
-        for s in g['samples'].keys():
+    for g in list(genomes.values()):
+        for s in list(g['samples'].keys()):
             samples.append(s)
     samples = sorted([i for i in set(samples)])
     header = ['# genome', 'ORI', 'TER'] + samples
-    print >> out, '\t'.join(header)
-    for gn, genome in genomes.items():
+    print('\t'.join(header), file=out)
+    for gn, genome in list(genomes.items()):
         ptr = [gn, '{:,}'.format(genome['ORI']), '{:,}'.format(genome['TER'])]
         for sample in samples:
             sample = genome['samples'][sample]
@@ -703,7 +703,7 @@ def print_table(genomes, out):
                 ptr.append(False)
             else:
                 ptr.append(sample['ptr'])
-        print >> out, '\t'.join([str(i) for i in ptr])
+        print('\t'.join([str(i) for i in ptr]), file=out)
 
 def open_files(files):
     """
@@ -730,7 +730,7 @@ def validate_args(args):
     check that arguments are supplied correctly
     """
     if args['p'] is not False and args['p'] <= 10:
-        print >> sys.stderr, '# -p must be >= 10 or False (no permutation analysis)'
+        print('# -p must be >= 10 or False (no permutation analysis)', file=sys.stderr)
         exit()
     if args['p'] is not False and type(args['p']) is not int and args['p'].lower() == 'false':
         args['p'] = False
@@ -738,10 +738,10 @@ def validate_args(args):
         args['p'] = int(args['p'])
     if args['c'] is False:
         if args['f'] is None or args['s'] is None:
-            print >> sys.stderr, '# -f and -s are required, or -c (-h for help)'
+            print('# -f and -s are required, or -c (-h for help)', file=sys.stderr)
             exit()
     if (args['m'] == 'gc_skew' or args['m'] == 'coverage') is False:
-        print >> sys.stderr, '# method may be \'gc_skew\' or \'coverage\''
+        print('# method may be \'gc_skew\' or \'coverage\'', file=sys.stderr)
         exit()
     # check if files already exist
     found = []
@@ -749,8 +749,8 @@ def validate_args(args):
         if i is not False and os.path.isfile(i) and args['ff'] is False:
             found.append(i)
     if len(found) > 0:
-        print >> sys.stderr, '# file(s): %s already exist. Use -ff to overwrite.' \
-                % (', '.join(found))
+        print('# file(s): %s already exist. Use -ff to overwrite.' \
+                % (', '.join(found)), file=sys.stderr)
         exit()
     return args
 

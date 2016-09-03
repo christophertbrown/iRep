@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 
 """
 script for calculating gc skew
@@ -42,18 +42,18 @@ def plot_two(title, subtitle, A, B, labels, legend, vert = False):
         x, y = a
         ax1.set_ylabel(labels[0])
         ax1.set_xlabel(labels[-1])
-        ax1.plot(x, y, c = a_colors.next(), marker = 'o', ms = 4, label = a_label.next())
+        ax1.plot(x, y, c = next(a_colors), marker = 'o', ms = 4, label = next(a_label))
     # add vertical lines
     if vert is not False:
         for i in vert:
             x, c = i
-            ax1.axvline(x = x, c = c, label = a_label.next(), linewidth = 2)
+            ax1.axvline(x = x, c = c, label = next(a_label), linewidth = 2)
     # plot right axis
     ax2 = ax1.twinx()
     for b in B:
         x, y = b
         ax2.set_ylabel(labels[1])
-        ax2.plot(x, y, c = b_colors.next(), linewidth = 2, label = b_label.next())
+        ax2.plot(x, y, c = next(b_colors), linewidth = 2, label = next(b_label))
     xmin = min([min(i[0]) for i in A] + [min(i[0]) for i in B])
     xmax = max([max(i[0]) for i in A] + [max(i[0]) for i in B])
     ax2.set_xlim(xmin, xmax)
@@ -106,7 +106,7 @@ def find_ori_ter(c_skew, length):
         c_skew_max = [[c_skew[0][i], c_skew[1][i]] for i in c_skew_max]
         ori, ter = check_peaks([c_skew_min, c_skew_max], length)
     return ori, ter
-    
+
 def gc_skew(name, length, seq, window, slide, plot_skew):
     """
     calculate gc skew and cumulative sum of gc skew over sequence windows
@@ -220,17 +220,17 @@ if __name__ == '__main__':
         min_len = 10 * window
     for name, length, seq in parse_genomes(fastas, single):
         if length < min_len:
-            print >> sys.stderr, '%s: Too Short' % (name)
+            print('%s: Too Short' % (name), file=sys.stderr)
             continue
         ori, ter, skew, c_skew = gc_skew(name, length, seq, window, slide, plot_skew)
         if ori == False:
             ori, ter = 'n/a', 'n/a'
         else:
             ori, ter = '{:,}'.format(ori), '{:,}'.format(ter)
-        print >> sys.stderr, '%s -> Origin: %s Terminus: %s' \
-                % (name, ori, ter)
+        print('%s -> Origin: %s Terminus: %s' \
+                % (name, ori, ter), file=sys.stderr)
         if plot_skew is False:
-            print '\t'.join(['# Name', 'Position', 'GC Skew', 'Cumulative GC Skew'])
+            print('\t'.join(['# Name', 'Position', 'GC Skew', 'Cumulative GC Skew']))
             for i, pos in enumerate(skew[0]):
                 out = [name, pos, skew[1][i], c_skew[1][i]]
-                print '\t'.join([str(i) for i in out])
+                print('\t'.join([str(i) for i in out]))
