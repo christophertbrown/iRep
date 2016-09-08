@@ -1,0 +1,8 @@
+# requirements for iRep.py and other scripts
+lmfit
+numpy
+scipy
+pandas
+seaborn
+matplotlib
+cPickle
