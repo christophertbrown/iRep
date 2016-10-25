@@ -958,8 +958,8 @@ def parse_genomes_sam(id2g, mappings):
             genomes[name]['samples'][sam]['contigs'][ID] = [0 for i in range(0, length)]
     return genomes
 
-def iRep(fastas, id2g, mappings, out, pickle, plot, \
-            test, thresholds, gc_correction, threads):
+def iRep(fastas, mappings, out, pickle, plot, \
+            thresholds, gc_correction, threads):
     """
     est. growth from slope of coverage
      1) calculate coverage over windows
@@ -974,7 +974,7 @@ def iRep(fastas, id2g, mappings, out, pickle, plot, \
         genomes, id2g = parse_genomes_fa(fastas, mappings)
     else:
         genomes = parse_genomes_sam(id2g, mappings)
-        
+
     # get coverage from sam files
     genomes = calc_coverage(genomes, mappings, id2g)
 
@@ -983,9 +983,6 @@ def iRep(fastas, id2g, mappings, out, pickle, plot, \
 
     # filter out any genome -> sample pairs not passing thresholds
     pairs = [(g, s) for g, s in pairs if s in genomes[g]['samples']]
-    if test is not False:
-        genomes = test_slopes(genomes, pairs, out, plot, test, thresholds, threads)
-        return genomes
 
     # calc coverage windows
     genomes, pairs = \
@@ -993,7 +990,7 @@ def iRep(fastas, id2g, mappings, out, pickle, plot, \
 
     # calculate per sample slope and estimate growth
     genomes = calc_growth(genomes, pairs, thresholds, threads)
-    
+
     # save results
     if out is not False:
         print_table(genomes, mappings, out, thresholds)
@@ -1126,10 +1123,6 @@ def validate_args(args):
         print('# file(s): %s already exist. Use -ff to overwrite.' \
                 % (', '.join(found)), file=sys.stderr)
         exit()
-    if args['test'] is not False:
-        if args['test'] != 'fragments' and args['test'] != 'iRep':
-            print('# test methods include: fragments or iRep', file=sys.stderr)
-            exit()
     if args['f'] is None and args['gc_correction'] is True:
         print('# -f requred for % GC correction', file=sys.stderr)
         exit()
@@ -1139,11 +1132,8 @@ if __name__ == '__main__':
     desc = '# calculate the Index of Replication (iRep)'
     parser = argparse.ArgumentParser(description = desc)
     parser.add_argument(\
-            '-f', nargs = '*', action = 'store', required = False, \
+            '-f', nargs = '*', action = 'store', required = True, \
             help = 'fasta(s)')
-    parser.add_argument(\
-            '-b', nargs = '*', action = 'store', required = False, \
-            help = 'scaffold to bin lookup file (use instead of -f)')
     parser.add_argument(\
             '-s', nargs = '*', action = 'store', required = True, \
             help = 'sorted sam file(s) for each sample (e.g.: bowtie2 --reorder)')
@@ -1152,7 +1142,7 @@ if __name__ == '__main__':
             help = 'prefix for output files (table and plots)')
     parser.add_argument(\
             '--pickle', action = 'store_true', \
-            help = 'save pickle file')
+            help = 'save pickle file (optional)')
     parser.add_argument(\
             '-mm', required = False, default = False, type = int, \
             help = 'max. # of read mismatches allowed (default: no limit)')
@@ -1162,9 +1152,6 @@ if __name__ == '__main__':
     parser.add_argument(\
             '-M', default = '100', \
             help = 'max. memory (GB) for sorting sam (default: 100)')
-    parser.add_argument(\
-            '-test', default = False, type = str, \
-            help = 'optional - run test: fragments or iRep')
     parser.add_argument(\
             '--no-plot', action = 'store_true', \
             help = 'do not plot output')
@@ -1186,19 +1173,11 @@ if __name__ == '__main__':
     # cancel plotting
     if args['no_plot'] is True:
         args['plot'] = False
-    # dictionary for scaffold to bin lookup
-    s2bin = None
-    if args['b'] is not None:
-        s2bin = {}
-        for i in args['b']:
-            for line in open(i):
-                line = line.strip().split('\t')
-                s2bin[line[0]] = line[1]
     # thresholds
     thresholds = {'min_cov':5, 'min_wins':0.98, 'min_r2':0.90, \
                     'fragMbp':175, 'GC_min_r2':0.0}
     # calculate iRep
     genomes = iRep(\
-                fastas, s2bin, mappings, \
-                args['table'], args['pickle'], args['plot'], args['test'], \
+                fastas, mappings, \
+                args['table'], args['pickle'], args['plot'],
                 thresholds, args['no_gc_correction'], args['t'])

@@ -1,20 +1,36 @@
-## index of replication (iRep) - thresholds: min cov. = 5, min wins. = 0.98, min r^2 = 0.9
-# genome	sample_data/l_gasseri.fna-vs-l_gasseri_sample1-shrunk.sam	sample_data/l_gasseri.fna-vs-l_gasseri_sample2-shrunk.sam
-sample_data/l_gasseri.fna	1.90999885587	2.37344581486
+## index of replication (iRep) - thresholds: min cov. = 5, min wins. = 0.98, min r^2 = 0.9, max fragments/Mbp = 175, GC correction min r^2 = 0.0
+# genome	l_gasseri.fna-vs-l_gasseri_sample1-shrunk.sam	l_gasseri.fna-vs-l_gasseri_sample2-shrunk.sam
+l_gasseri.fna	1.90674426035	2.35837750424
 #
-## index of replication (iRep)
-# genome	sample_data/l_gasseri.fna-vs-l_gasseri_sample1-shrunk.sam	sample_data/l_gasseri.fna-vs-l_gasseri_sample2-shrunk.sam
-sample_data/l_gasseri.fna	1.90999885587	2.37344581486
+## un-filtered index of replication (iRep)
+# genome	l_gasseri.fna-vs-l_gasseri_sample1-shrunk.sam	l_gasseri.fna-vs-l_gasseri_sample2-shrunk.sam
+l_gasseri.fna	1.90674426035	2.35837750424
+#
+## raw index of replication (no GC bias correction)
+# genome	l_gasseri.fna-vs-l_gasseri_sample1-shrunk.sam	l_gasseri.fna-vs-l_gasseri_sample2-shrunk.sam
+l_gasseri.fna	1.91919924616	2.38274419025
 #
 ## r^2
-# genome	sample_data/l_gasseri.fna-vs-l_gasseri_sample1-shrunk.sam	sample_data/l_gasseri.fna-vs-l_gasseri_sample2-shrunk.sam
-sample_data/l_gasseri.fna	0.997036208714	0.995030018321
+# genome	l_gasseri.fna-vs-l_gasseri_sample1-shrunk.sam	l_gasseri.fna-vs-l_gasseri_sample2-shrunk.sam
+l_gasseri.fna	0.998875662811	0.9947136569
 #
 ## coverage
-# genome	sample_data/l_gasseri.fna-vs-l_gasseri_sample1-shrunk.sam	sample_data/l_gasseri.fna-vs-l_gasseri_sample2-shrunk.sam
-sample_data/l_gasseri.fna	9.53757997424	9.15663337486
+# genome	l_gasseri.fna-vs-l_gasseri_sample1-shrunk.sam	l_gasseri.fna-vs-l_gasseri_sample2-shrunk.sam
+l_gasseri.fna	9.53796669764	9.15695928538
 #
 ## % windows passing filter
-# genome	sample_data/l_gasseri.fna-vs-l_gasseri_sample1-shrunk.sam	sample_data/l_gasseri.fna-vs-l_gasseri_sample2-shrunk.sam
-sample_data/l_gasseri.fna	100.00	100.00
+# genome	l_gasseri.fna-vs-l_gasseri_sample1-shrunk.sam	l_gasseri.fna-vs-l_gasseri_sample2-shrunk.sam
+l_gasseri.fna	100.00	100.00
+#
+## fragments/Mbp
+# genome	l_gasseri.fna-vs-l_gasseri_sample1-shrunk.sam	l_gasseri.fna-vs-l_gasseri_sample2-shrunk.sam
+l_gasseri.fna	1	1
+#
+## GC bias
+# genome	l_gasseri.fna-vs-l_gasseri_sample1-shrunk.sam	l_gasseri.fna-vs-l_gasseri_sample2-shrunk.sam
+l_gasseri.fna	0.0765716270262	0.00504296590463
+#
+## GC r^2
+# genome	l_gasseri.fna-vs-l_gasseri_sample1-shrunk.sam	l_gasseri.fna-vs-l_gasseri_sample2-shrunk.sam
+l_gasseri.fna	0.0106871266034	0.00143690878965
 #
