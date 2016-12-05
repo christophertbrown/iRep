@@ -1,8 +1,8 @@
 # iRep.py and bPTR.py
 
-These scripts are described in:
+Scripts are described in:
 
-“In situ replication rates for uncultivated bacteria in microbial communities” - Christopher T. Brown, Matthew R. Olm, Brian C. Thomas, Jillian F. Banfield
+“Measurement of bacterial replication rates in microbial communities” - Christopher T. Brown, Matthew R. Olm, Brian C. Thomas, Jillian F. Banfield
 
 http://dx.doi.org/10.1101/057992
 
