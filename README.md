@@ -13,7 +13,6 @@ scipy
 pandas
 seaborn
 matplotlib
-cPickle
 
 ##Example usage:
 
