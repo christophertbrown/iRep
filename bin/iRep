@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+
+"""
+script for estimating microbial population replication rates (iRep)
+from slope of coverage across complete or draft-quality genomes
+
+Chris Brown
+ctb@berkeley.edu
+"""
+
+# python modules
+import os
+import sys
+import argparse
+
+# iRep
+import iRep.iRep as iRep
+
+if __name__ == '__main__':
+    desc = '# calculate the Index of Replication (iRep)'
+    parser = argparse.ArgumentParser(description = desc)
+    parser.add_argument(\
+            '-f', nargs = '*', action = 'store', required = True, \
+            help = 'fasta(s)')
+    parser.add_argument(\
+            '-s', nargs = '*', action = 'store', required = True, \
+            help = 'sorted sam file(s) for each sample (e.g.: bowtie2 --reorder)')
+    parser.add_argument(\
+            '-o', required = True, type = str, \
+            help = 'prefix for output files (table and plots)')
+    parser.add_argument(\
+            '--pickle', action = 'store_true', \
+            help = 'save pickle file (optional)')
+    parser.add_argument(\
+            '-mm', required = False, default = 1, type = int, \
+            help = 'max. # of read mismatches allowed (default: 1)')
+    parser.add_argument(\
+            '--sort', action = 'store_true', \
+            help = 'optional - sort the sam file')
+    parser.add_argument(\
+            '-M', default = '100', \
+            help = 'max. memory (GB) for sorting sam (default: 100)')
+    parser.add_argument(\
+            '--no-plot', action = 'store_true', \
+            help = 'do not plot output')
+    parser.add_argument(\
+            '--no-gc-correction', action = 'store_false', \
+            help = 'do not correct coverage for GC bias before calculating iRep')
+    parser.add_argument(\
+            '-ff', action = 'store_true', \
+            help = 'overwrite files')
+    parser.add_argument(\
+            '-t', required = False, default = 6, type = int, \
+            help = 'threads (default: 6)')
+    args = vars(parser.parse_args())
+    args = iRep.validate_args(args)
+    fastas = iRep.open_files(args['f'])
+    sams, mm, sort, sort_b = args['s'], args['mm'], args['sort'], args['M']
+    # generator for mapping
+    mappings = [[s, iRep.filter_mapping(s, mm, sort, sort_b)] for s in sams]
+    # cancel plotting
+    if args['no_plot'] is True:
+        args['plot'] = False
+    # thresholds
+    thresholds = {'min_cov':5, 'min_wins':0.98, 'min_r2':0.90, \
+                    'fragMbp':175, 'GC_min_r2':0.0}
+    # calculate iRep
+    genomes = iRep.iRep(\
+                fastas, mappings, \
+                args['table'], args['pickle'], args['plot'],
+                thresholds, args['no_gc_correction'], args['t'])
