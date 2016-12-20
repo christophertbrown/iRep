@@ -4,7 +4,7 @@ Described in:
 
 “Measurement of bacterial replication rates in microbial communities” - Christopher T. Brown, Matthew R. Olm, Brian C. Thomas, Jillian F. Banfield
 
-http://dx.doi.org/10.1101/057992
+http://dx.doi.org/10.1038/nbt.3704
 
 Requires python3 and the following packages:
 lmfit
