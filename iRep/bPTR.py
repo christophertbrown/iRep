@@ -647,12 +647,12 @@ def parse_genomes(fastas, mappings):
 def growth_from_ptr(fastas, mappings, out, pickle_in, pickle_out, \
         method, plot, perms, threads):
     """
-    est. growth rate from peak-to-trough coverage ratio 
+    est. growth rate from peak-to-trough coverage ratio
      1) calculate coverage
      2) smooth/normalize/filter coverage calculations
      3) find ori and ter of replication based on either:
-        - fitting coverage function* to smoothed/normalized/filtered coverage 
-           using Levenberg-Marquardt algorithm 
+        - fitting coverage function* to smoothed/normalized/filtered coverage
+           using Levenberg-Marquardt algorithm
            * = piecewise linear function from Korem 2015
         - gc skew
      4) calculate PTR for each genome and sample based on consesus location of Ori/Ter
@@ -669,7 +669,7 @@ def growth_from_ptr(fastas, mappings, out, pickle_in, pickle_out, \
             genomes = sample_ptr_from_coverage(genomes, mappings, perms, threads)
         elif method == 'gc_skew':
             genomes = ori_from_gc_skew(genomes, mappings, threads)
-        else: 
+        else:
             print('# specify method: gc_skew or coverage', file=sys.stderr)
             exit()
         # calculate ptr based on ori, ter calculated across samples
@@ -678,10 +678,10 @@ def growth_from_ptr(fastas, mappings, out, pickle_in, pickle_out, \
         genomes = pickle.load(open(pickle_in, 'rb'))
     if pickle_out is not False:
         pickle.dump(genomes, open(pickle_out, 'wb'))
-    if out is not False: 
+    if out is not False:
         print_table(genomes, out)
-    if args['plot'] is not False:
-        plot_genomes(genomes, args['plot'])
+    if plot is not False:
+        plot_genomes(genomes, plot)
     return genomes
 
 def print_table(genomes, out):

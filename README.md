@@ -17,13 +17,13 @@ matplotlib
 ##Example usage:
 
 ### iRep
-./iRep/iRep.py -f sample_data/l_gasseri.fna -s sample_data/l_gasseri*sam -o test.iRep
+./bin/iRep -f sample_data/l_gasseri.fna -s sample_data/l_gasseri*sam -o test.iRep
 
 ### bPTR
-./iRep/bPTR.py -f sample_data/l_gasseri.fna -s sample_data/l_gasseri*sam -o test.bPTR.tsv -plot test.bPTR.pdf -m coverage
+./bin/bPTR -f sample_data/l_gasseri.fna -s sample_data/l_gasseri*sam -o test.bPTR.tsv -plot test.bPTR.pdf -m coverage
 
 ### GC Skew
-./iRep/gc_skew.py -f sample_data/l_gasseri.fna
+./bin/gc_skew -f sample_data/l_gasseri.fna
 
 #### Example output is provided in sample_output. 
 

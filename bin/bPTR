@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+
+"""
+script for estimating growth rate from peak-to-trough coverage ratios
+based on method from Korem et al. 2015
+
+Chris Brown
+ctb@berkeley.edu
+"""
+
+# python modules
+import os
+import sys
+import argparse
+
+# ctb
+from iRep import bPTR as bPTR
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description = \
+            '# est. growth rate from peak-to-trough coverage ratio')
+    parser.add_argument(\
+            '-f', nargs = '*', action = 'store', required = False, \
+            help = 'fasta(s)')
+    parser.add_argument(\
+            '-s', nargs = '*', action = 'store', required = False, \
+            help = 'sorted sam file(s) for each sample (e.g.: bowtie2 --reorder)')
+    parser.add_argument(\
+            '-m', required = True, type = str, \
+            help = 'method for detecting Ori/Ter of replication: gc_skew or coverage')
+    parser.add_argument(\
+            '-c', required = False, default = False, \
+            help = 'pre-computed data from growth_ptr.py (optional: pickle file)')
+    parser.add_argument(\
+            '-o', required = True, type = str, \
+            help = 'filename for output table')
+    parser.add_argument(\
+            '-pickle', required = False, default = False, \
+            help = 'filename for output pickle file (optional)')
+    parser.add_argument(\
+            '-plot', required = True, type = str, \
+            help = 'filename for coverage profile plots (default: no plots)')
+    parser.add_argument(\
+            '-mm', required = False, default = False, type = int, \
+            help = 'maximum number of mapping mismatches allowed (default: no limit)')
+    parser.add_argument(\
+            '-p', required = False, default = False, \
+            help = 'number of permutations to perform (default: None)')
+    parser.add_argument(\
+            '--sort', action = 'store_true', help = 'sort the sam file')
+    parser.add_argument(\
+            '-b', default = '100', help = 'max memory (GB) for sorting sam (default: 100)')
+    parser.add_argument(\
+            '-ff', action = 'store_true', help = 'overwrite files')
+    parser.add_argument(\
+            '-t', required = False, default = 6, type = int, \
+            help = 'threads (default: 6)')
+    args = vars(parser.parse_args())
+    args = bPTR.validate_args(args)
+    fastas = bPTR.open_files(args['f'])
+    sams, mm, sort, sort_b = args['s'], args['mm'], args['sort'], args['b']
+    out, pickle_in, pickle_out = open(args['o'], 'w'), args['c'], args['pickle']
+    if sams is not None:
+        mappings = [[s, bPTR.filter_mapping(s, mm, sort, sort_b)] for s in sams]
+    else:
+        mappings = False
+    genomes = bPTR.growth_from_ptr(fastas, mappings, out, pickle_in, pickle_out, \
+            args['m'], args['plot'], args['p'], args['t'])
