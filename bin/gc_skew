@@ -13,6 +13,7 @@ import sys
 import argparse
 
 # ctb
+sys.path.append((os.path.dirname(os.path.abspath(__file__)).rsplit('/', 1)[0]))
 from iRep import gc_skew as gc_skew
 
 if __name__ == '__main__':

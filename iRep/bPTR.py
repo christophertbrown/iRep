@@ -478,7 +478,7 @@ def ori_from_gc_skew(genomes, mapping, threads):
             genomes[name]['TER'] = [ter]
     # generate list of all genomes and samples
     pool = Pool(threads)
-    pairs = product(list(genomes.keys()), [i[0] for i in mappings])
+    pairs = product(list(genomes.keys()), [i[0] for i in mapping])
     # calculate median coverage filter for each genome and sample pair
     for sample in \
         pool.map(median_filter_names, \
@@ -492,7 +492,7 @@ def ori_from_gc_skew(genomes, mapping, threads):
 
 def circular_median(P, G):
     """
-    calculate circular median 
+    calculate circular median
     see Korem et al 2015
     P = list of positions
     G = genome length
@@ -512,7 +512,7 @@ def circular_median(P, G):
 def calc_ptr(genomes, min_samples = 1):
     """
     calculate PTR for each sample based on coverage at Ori and Ter
-     locations re-calculated based on the circular median of Ori and Ter 
+     locations re-calculated based on the circular median of Ori and Ter
      positions determined across samples
     """
     for genome in list(genomes.values()):
@@ -707,7 +707,7 @@ def print_table(genomes, out):
 
 def open_files(files):
     """
-    open files in list, use stdin if first 
+    open files in list, use stdin if first
     item in list is '-'
     """
     if files is None:

@@ -7,9 +7,9 @@ from distutils.core import setup
 setup(
   name='iRep',
   packages = ['iRep'],
-  scripts = ['bin/iRep'],
-  version='1.1',
-  description='calcualte iRep replication rates from metagenome sequencing',
+  scripts = ['bin/iRep', 'bin/bPTR', 'bin/gc_skew'],
+  version='1.1.2',
+  description='calculate iRep replication rates from metagenome sequencing',
   author='Chris Brown',
   author_email='ctb@berkeley.edu',
   license='MIT',
