@@ -28,8 +28,9 @@ plt.rcParams['pdf.fonttype'] = 42
 from matplotlib.backends.backend_pdf import PdfPages
 
 # ctb
-from iRep.mapped import get_reads as mapped
-from iRep.fasta import iterate_fasta as parse_fasta
+#sys.path.append((os.path.dirname(os.path.abspath(__file__)).rsplit('/', 1)[0]))
+from mapped import get_reads as mapped
+from fasta import iterate_fasta as parse_fasta
 
 def plot_coverage(cov, trimmed, avg_cov, length, fit, iRep, uiRep, r2, kept_windows, title):
     """
@@ -115,7 +116,7 @@ def plot_coverage_gc(sample, avg_cov, length, kept_windows, title, show = False)
                     marker = 'o', label = 'corrected', \
                     c = 'g', alpha = 1, markersize = 5, linewidth = 0)
         ax2.set_xlabel(xlab)
-        # plot fit to corrected data 
+        # plot fit to corrected data
         Cfit = sample['Cfit']
         if Cfit is not False:
             ax2.plot(Cfit[0], Cfit[1], \
@@ -241,14 +242,14 @@ def calc_coverage(genomes, mappings, id2g, mask_edges = True):
             start, length = int(read[3]), len(read[9])
             end = start + length - 1
             for i in range(start - 1, end):
-                try: 
+                try:
                     genomes[id2g[c]]['samples'][sample]\
                             ['contigs'][c][i] += 1
                 except:
                     continue
     # combine coverage and gc data for contigs
     for genome in list(genomes.values()):
-        order, samples = genome['order'], genome['samples'] 
+        order, samples = genome['order'], genome['samples']
         for sample in list(samples.values()):
             for contig in order:
                 try:
@@ -275,7 +276,7 @@ def log_trans(array):
             lt.append(np.log2(i))
     return lt
 
-def coverage_function(pars, X, data = None, printPs = False): 
+def coverage_function(pars, X, data = None, printPs = False):
     """
     linear function for sorted coverage profile
     y = mx + b
@@ -308,7 +309,7 @@ def fit_coverage(pars):
     # fit data to model
     mi = lmfit.minimize(coverage_function, Pars, args = (x,), \
             kws = {'data':y, 'printPs':False}, method = 'leastsq')
-    # calculate r-squared 
+    # calculate r-squared
     r2 = 1 - (mi.residual.var() / np.var(y))
     if return_fit is False:
         return (mi.params['m'].value, mi.params['b'].value, r2, info)
@@ -524,7 +525,7 @@ def iRep_from_fragments(pars):
                 windows[0].append(x)
                 windows[1].append(np.average(contigCov))
                 x += slide
-        results['iRep'] = windows2iRep(windows, L, thresholds) 
+        results['iRep'] = windows2iRep(windows, L, thresholds)
         return results
 
     ## other methods?
@@ -581,7 +582,7 @@ def plot_tests(genomes, pairs, out, plot, cats, y_lab, normalize = False):
         s = s.rsplit('.', 1)[0].replace('_', ' ')
         l, n50, m = sample['test']
         lengths.extend(l)
-        slopes.extend(m) 
+        slopes.extend(m)
         samples.extend([s for i in m])
         n50s.extend(n50)
     if normalize == 'log2':
@@ -620,7 +621,7 @@ def print_tests(genomes, pairs, out, cats, y_lab, normalize = False):
                 test_results['iRep'], test_results['test'], \
                 test_results['range']
         lengths.extend(l)
-        slopes.extend(m) 
+        slopes.extend(m)
         samples.extend([s for i in m])
         n50s.extend(n50)
         fragments.extend(num_fragments)
@@ -635,7 +636,7 @@ def print_tests(genomes, pairs, out, cats, y_lab, normalize = False):
 def test_slopes(genomes, pairs, out, plot, test, thresholds, threads):
     """
     test methods for using slope to approximate growth:
-    1) 'fragments': calculate slope of genome fragemnts 
+    1) 'fragments': calculate slope of genome fragemnts
         - test min. size fragment required for reliable results
     2) 'iRep': calculate iRep based on sorted coverage windows from simulated genome fragments
         - test percent of genome required for reliable results
@@ -903,7 +904,7 @@ def parse_genomes_fa(fastas, mappings, mask_edges = True):
         samples[sample name] = {cov: [coverage by position], contigs: {}}
             contigs[contig name] = [coverage by position]
     """
-    id2g = {} # contig ID to genome lookup 
+    id2g = {} # contig ID to genome lookup
     genomes = {} # dictionary for saving genome info
     for genome in fastas:
         name = genome.name
@@ -911,7 +912,7 @@ def parse_genomes_fa(fastas, mappings, mask_edges = True):
         g = genomes[name] = {'order':[], 'samples':samples}
         g['len'] = 0
         genome_seq = []
-        for seq in parse_fasta(genome): 
+        for seq in parse_fasta(genome):
             ID = seq[0].split('>', 1)[1].split()[0]
             g['order'].append(ID)
             id2g[ID] = name
@@ -930,7 +931,7 @@ def parse_genomes_fa(fastas, mappings, mask_edges = True):
 
 def parse_genomes_sam(id2g, mappings):
     """
-    id2g = {} # contig ID to genome lookup 
+    id2g = {} # contig ID to genome lookup
     genomes[genome name] = {order: [contig order], samples: {}}
         samples[sample name] = {cov: [coverage by position], contigs: {}}
             contigs[contig name] = [coverage by position]
@@ -1128,7 +1129,11 @@ def validate_args(args):
         exit()
     return args
 
-if __name__ == '__main__':
+def parse_irep_args(args):
+    '''
+    Run argparse
+    '''
+
     desc = '# calculate the Index of Replication (iRep)'
     parser = argparse.ArgumentParser(description = desc)
     parser.add_argument(\
@@ -1164,7 +1169,14 @@ if __name__ == '__main__':
     parser.add_argument(\
             '-t', required = False, default = 6, type = int, \
             help = 'threads (default: 6)')
-    args = vars(parser.parse_args())
+
+    return parser.parse_args(args)
+
+def main(args):
+    '''
+    run the main iRep program
+    '''
+
     args = validate_args(args)
     fastas = open_files(args['f'])
     sams, mm, sort, sort_b = args['s'], args['mm'], args['sort'], args['M']
@@ -1181,3 +1193,7 @@ if __name__ == '__main__':
                 fastas, mappings, \
                 args['table'], args['pickle'], args['plot'],
                 thresholds, args['no_gc_correction'], args['t'])
+
+if __name__ == '__main__':
+    args = vars(parse_irep_args(sys.argv[1:]))
+    main(args)
