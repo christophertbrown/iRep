@@ -46,4 +46,4 @@ bPTR.py and iRep.py output both a table (.tsv file) of results and a PDF with pl
 
 ### IMPORTANT:
 
-Both iRep and bPTR require ordered SAM files that can be generated using the Bowtie2 --reorder flag.
+Both iRep and bPTR require ordered SAM files that can be generated using the Bowtie2 --reorder flag. Ordered SAM files, where both reads representing a set of paired reads are ordered one after the other, are requred for these scripts to filter reads based on mapping quality. If the SAM file is not sorted, the scripts will make incorrect choices about which mapped reads to include when calculating coverage. This only applies when using a mapping quality cutoff; however, using a quality cutoff is recommend as it helps with off-target read mapping.
