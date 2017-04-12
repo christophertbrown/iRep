@@ -8,6 +8,14 @@ Chris Brown
 ctb@berkeley.edu
 """
 
+# plotting modules
+from matplotlib import use as mplUse
+mplUse('Agg')
+import matplotlib.pyplot as plt
+plt.rcParams['pdf.fonttype'] = 42
+from matplotlib.backends.backend_pdf import PdfPages
+import seaborn as sns
+
 # python modules
 import os
 import sys
@@ -15,17 +23,11 @@ import lmfit
 import random
 import argparse
 import numpy as np
+import pandas as pd
 import pickle as Pickle
 from scipy import signal
 from itertools import product
 from multiprocessing import Pool
-
-# plotting modules
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-plt.rcParams['pdf.fonttype'] = 42
-from matplotlib.backends.backend_pdf import PdfPages
 
 # ctb
 from iRep.mapped import get_reads as mapped

@@ -18,10 +18,12 @@ from scipy import signal
 from scipy import ndimage
 import pickle as pickle
 from itertools import product
-import matplotlib.pyplot as plt
 from multiprocessing import Pool
 
 # plotting modules
+from matplotlib import use as mplUse
+mplUse('Agg')
+import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 plt.rcParams['pdf.fonttype'] = 42
 

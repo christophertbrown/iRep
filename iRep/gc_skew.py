@@ -15,6 +15,13 @@ import numpy as np
 from scipy import signal
 from itertools import cycle, product
 
+# plotting modules
+from matplotlib import use as mplUse
+mplUse('Agg')
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+plt.rcParams['pdf.fonttype'] = 42
+
 # ctb
 from iRep.fasta import iterate_fasta as parse_fasta
 
@@ -27,10 +34,6 @@ def plot_two(title, subtitle, A, B, labels, legend, vert = False):
     lables = [left label, right label, x label]
     legend = [[left legend], [right legend]]
     """
-    import matplotlib.pyplot as plt
-    plt.rcParams['pdf.fonttype'] = 42
-    from matplotlib.backends.backend_pdf import PdfPages
-
     fig, ax1 = plt.subplots()
     colors = ['0.75', 'b', 'r', 'c', 'y', 'm', 'k', 'g']
     a_colors = cycle(colors)
