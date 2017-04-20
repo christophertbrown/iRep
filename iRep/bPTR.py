@@ -8,6 +8,13 @@ Chris Brown
 ctb@berkeley.edu
 """
 
+# plotting modules
+from matplotlib import use as mplUse
+mplUse('Agg')
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+plt.rcParams['pdf.fonttype'] = 42
+
 # python modules
 import os
 import sys
@@ -19,13 +26,6 @@ from scipy import ndimage
 import pickle as pickle
 from itertools import product
 from multiprocessing import Pool
-
-# plotting modules
-from matplotlib import use as mplUse
-mplUse('Agg')
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
-plt.rcParams['pdf.fonttype'] = 42
 
 # ctb
 from iRep.mapped import get_reads as mapped
