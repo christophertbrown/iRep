@@ -93,7 +93,8 @@ def check_peaks(peaks, length):
     closest, farthest = int(length * float(0.45)), int(length * float(0.55))
     pairs = []
     for pair in list(product(*peaks)):
-        tr, pk = pair # trough and peak
+        ### added this to make sure gets origin and ter right
+        tr, pk = sorted(list(pair), key = lambda x: x[1], reverse = False) # trough and peak
         a = (tr[0] - pk[0]) % length
         b = (pk[0] - tr[0]) % length
         pt = abs(tr[1] - pk[1]) # distance between values
