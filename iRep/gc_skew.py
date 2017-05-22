@@ -21,8 +21,12 @@ mplUse('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 plt.rcParams['pdf.fonttype'] = 42
+from matplotlib import rc
+rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 
 # ctb
+cwd = os.path.realpath(__file__)
+sys.path.insert(0, cwd.rsplit('/', 2)[0])
 from iRep.fasta import iterate_fasta as parse_fasta
 
 def plot_two(title, subtitle, A, B, labels, legend, vert = False):
@@ -43,7 +47,7 @@ def plot_two(title, subtitle, A, B, labels, legend, vert = False):
     # plot left axis and x - axis
     for a in A:
         x, y = a
-        ax1.set_ylabel(labels[0])
+        ax1.set_ylabel(labels[0], labelpad = 3)
         ax1.set_xlabel(labels[-1])
         ax1.plot(x, y, c = next(a_colors), marker = 'o', ms = 4, label = next(a_label))
     # add vertical lines
@@ -55,17 +59,25 @@ def plot_two(title, subtitle, A, B, labels, legend, vert = False):
     ax2 = ax1.twinx()
     for b in B:
         x, y = b
-        ax2.set_ylabel(labels[1])
+        ax2.set_ylabel(labels[1], labelpad = 8)
         ax2.plot(x, y, c = next(b_colors), linewidth = 2, label = next(b_label))
-    xmin = min([min(i[0]) for i in A] + [min(i[0]) for i in B])
+    xmin = min([min(i[1]) for i in A] + [min(i[0]) for i in B])
     xmax = max([max(i[0]) for i in A] + [max(i[0]) for i in B])
     ax2.set_xlim(xmin, xmax)
     # title
     plt.suptitle(title, fontsize = 16)
     plt.title(subtitle, fontsize = 10)
     # legend
-    ax1.legend(loc = 'upper left', bbox_to_anchor=(0.5, -0.1), prop = {'size':10})
-    plt.legend(loc = 'upper right', bbox_to_anchor=(0.5, -0.1), prop = {'size':10})
+    ax1.legend(loc = 'upper left', \
+               bbox_to_anchor=(0.55, -0.125), \
+               prop = {'size':8}, \
+               framealpha = 0.0
+              )
+    plt.legend(loc = 'upper right', \
+               bbox_to_anchor=(0.45, -0.125), \
+               prop = {'size':8}, \
+               framealpha = 0.0\
+              )
     # save
     pdf = PdfPages('%s.pdf' % title.replace(' ', '_'))
     pdf.savefig(bbox_inches = 'tight')
