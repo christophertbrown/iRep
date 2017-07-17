@@ -26,6 +26,11 @@ def load_data(datum):
         '../sample_data/l_gasseri.fna')
         return loc
 
+    elif datum =='test_stb':
+        loc = os.path.join(str(os.path.dirname(os.path.realpath(__file__))), \
+        '../sample_data/l_gasseri.stb')
+        return loc
+
     elif datum == 'test_sams':
         loc = os.path.join(str(os.path.dirname(os.path.realpath(__file__))), \
         '../sample_data/*.sam')
@@ -67,6 +72,15 @@ class TestiRep():
     class to do regression tests of iRep
     '''
 
+    def run_all(self):
+        self.setUp()
+
+        self.stb_test()
+
+        self.tearDown()
+
+        self.regression_test()
+
     def setUp(self):
         self.outdir = load_data('test_outdir')
         if os.path.exists(self.outdir):
@@ -74,18 +88,14 @@ class TestiRep():
         os.makedirs(self.outdir)
 
         self.genome = load_data('test_genome')
+        self.stb = load_data('test_stb')
         self.sams = load_data('test_sams')
         self.irep_solution = load_data('solution_irep')
 
     def tearDown(self):
-        pass
-
-    def run_all(self):
-        self.setUp()
-
-        self.regression_test()
-
-        self.tearDown()
+        if os.path.exists(self.outdir):
+            shutil.rmtree(self.outdir)
+        os.makedirs(self.outdir)
 
     def regression_test(self):
         '''
@@ -113,6 +123,35 @@ class TestiRep():
 
         assert sorted(sol_ireps) == sorted(test_ireps)
 
+    def stb_test(self):
+        '''
+        test the functioning of .stb input instead of .fasta
+        '''
+
+        # generate command
+        test_out = os.path.join(self.outdir, 'test.iRep')
+        cmd = ['iRep', '--no-gc-correction', '-b', self.stb, '-o', test_out, '-s'] + self.sams
+
+        # run command
+        execute_cmd(cmd)
+
+        # verify output
+        out_pdf = test_out + '.pdf'
+        assert os.stat(out_pdf).st_size > 0
+
+        out_tsv = test_out + '.tsv'
+        assert os.stat(out_tsv).st_size > 0
+
+        sol_tsv = self.irep_solution
+
+        sol_ireps = self.extract_ireps(sol_tsv)
+        test_ireps = self.extract_ireps(out_tsv)
+
+        # Allow some liniency because it's not GC corrected, and the solution is
+        for solution_value, test_value in zip(sorted(sol_ireps), sorted(test_ireps)):
+            assert abs(solution_value - test_value) <= .05, "{0} vs {1}".format(\
+                solution_value, test_value)
+
     def extract_ireps(self, tsv):
         '''
         from the path to the .tsv file, return a list of iRep values
@@ -124,11 +163,12 @@ class TestiRep():
                 val = irep[genome][sam]['iRep']
                 values.append(float("{0:.2f}".format(val)))
         return values
-        
+
 def test_short():
     '''
     tests that shouldn't take very long
     '''
+    pass
 
 def test_long():
     '''

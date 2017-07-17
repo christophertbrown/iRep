@@ -69,9 +69,9 @@ def check_mismatches(read, pair, mismatches, mm_option, req_map):
     if mm_option == 'one':
         if (r_mm is not False and r_mm <= mismatches) or (p_mm is not False and p_mm <= mismatches):
             return True
-    ## if option is 'both,' both reads have to pass threshold 
+    ## if option is 'both,' both reads have to pass threshold
     if mm_option == 'both':
-        ## if one read in pair does not map to the scaffold, 
+        ## if one read in pair does not map to the scaffold,
         ## make sure the other read passes threshold
         if r_mm is False:
             if p_mm <= mismatches:
@@ -80,7 +80,7 @@ def check_mismatches(read, pair, mismatches, mm_option, req_map):
             if r_mm <= mismatches:
                 return True
         elif (r_mm is not False and r_mm <= mismatches) and (p_mm is not False and p_mm <= mismatches):
-            return True 
+            return True
     return False
 
 def get_overlap(a, b):
@@ -99,7 +99,7 @@ def check_region(read, pair, region):
         if mapping is False:
             continue
         start, length = int(mapping[3]), len(mapping[9])
-        r = [start, start + length - 1] 
+        r = [start, start + length - 1]
         if get_overlap(r, region) > 0:
             return True
     return False
@@ -162,11 +162,11 @@ def get_reads(sam, \
             if os.path.exists(mapping) is False:
                 os.system("\
                     sort -k1 --buffer-size=%sG -T %s -o %s %s\
-                    " % (sbuffer, tempdir, mapping, sam)) 
+                    " % (sbuffer, tempdir, mapping, sam))
         else:
             mapping = 'stdin-sam.sorted.sam'
             p = Popen("sort -k1 --buffer-size=%sG -T %s -o %s" \
-                    % (sbuffer, tempdir, mapping), stdin = sys.stdin, shell = True) 
+                    % (sbuffer, tempdir, mapping), stdin = sys.stdin, shell = True)
             p.communicate()
         mapping = open(mapping)
     else:
