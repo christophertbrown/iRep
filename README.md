@@ -46,6 +46,8 @@ iRep and bPTR.py output both a table (.tsv file) of results and a PDF with plots
 
 Large SAM files with many unmapped reads will be slower to parse than SAM files that do not included unmapped reads. Unmapped reads can be quickly filtered out of the SAM file using [shrinksam](https://github.com/bcthomas/shrinksam).
 
+Users have reported receiving a "ImportError: No module named '_tkinter'" error. This can be fixed by modifying the bash MPLBACKEND variable: `export MPLBACKEND="agg"`.
+
 ### IMPORTANT:
 
 Both iRep and bPTR require ordered SAM files that can be generated using the Bowtie2 --reorder flag. Ordered SAM files, where both reads representing a set of paired reads are ordered one after the other, are requred for these scripts to filter reads based on mapping quality (see -mm option). If the SAM file is not sorted, be sure to either re-run Bowtie with the --reorder flag, or use the --sort option to sort the SAM file; otherwise, the scripts will make incorrect choices about which mapped reads to include when calculating coverage. The --sort option uses Unix sort to re-order the SAM file. This only applies when using a mapping quality cutoff; however, using a quality cutoff is recommend as it helps to prevent off-target read mapping.

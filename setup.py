@@ -8,7 +8,7 @@ setup(
   name='iRep',
   packages = ['iRep'],
   scripts = ['bin/iRep', 'bin/bPTR', 'bin/gc_skew', 'iRep/iRep_filter.py'],
-  version='1.1.6',
+  version='1.1.7',
   description='calculate iRep replication rates from metagenome sequencing',
   author='Chris Brown',
   author_email='ctb@berkeley.edu',
