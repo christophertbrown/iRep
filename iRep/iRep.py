@@ -30,8 +30,9 @@ from itertools import product
 from multiprocessing import Pool
 
 # ctb
-from mapped import get_reads as mapped
-from fasta import iterate_fasta as parse_fasta
+#sys.path.append((os.path.dirname(os.path.abspath(__file__)).rsplit('/', 1)[0]))
+from iRep.mapped import get_reads as mapped
+from iRep.fasta import iterate_fasta as parse_fasta
 
 def plot_coverage(cov, trimmed, avg_cov, length, fit, iRep, uiRep, r2, kept_windows, title):
     """
