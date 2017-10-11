@@ -25,8 +25,6 @@ from matplotlib import rc
 rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 
 # ctb
-cwd = os.path.realpath(__file__)
-sys.path.insert(0, cwd.rsplit('/', 2)[0])
 from iRep.fasta import iterate_fasta as parse_fasta
 
 def plot_two(title, subtitle, A, B, labels, legend, vert = False):
