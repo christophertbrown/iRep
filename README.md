@@ -14,7 +14,7 @@ The method is described in:
 
 `iRep` -> measure replication rates using draft-quality genome sequences
 
-`iRep_filter` -> combine and/or filter iRep output
+`iRep_filter.py` -> combine and/or filter iRep output
 
 `bPTR` -> measure replication rates using complete genome sequences (modified from Korem et al. *Science* 2015)
 

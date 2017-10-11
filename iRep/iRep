@@ -423,7 +423,7 @@ def windows2iRep(windows, L, thresholds):
     calculate iRep from slide window coverage calculations
     """
     # filter zero coverage windows
-    Fwindows = filter_windows(windows)
+    Fwindows = filter_windows(windows, mdif = thresholds['win_cov'])
     total_windows = len(windows[0])
     total_Fwindows = len(Fwindows[0])
     kept_windows = float(total_Fwindows)/float(total_windows)
@@ -797,11 +797,13 @@ def coverage_windows(sample, window = 5000, slide = 100):
     # filter zero coverage windows
     sample['windows'] = windows
     if gc is not False:
-        Fwindows, Fgc = filter_windows(windows, gc)
+        Fwindows, Fgc = filter_windows(windows, gc, mdif = thresholds['win_cov'])
+
         sample['GC'] = Fgc
         sample['Fwindows'] = Fwindows # only need this for plotting GC data
     else:
-        Fwindows = filter_windows(windows)
+        Fwindows = filter_windows(windows, mdif = thresholds['win_cov'])
+
     total_windows = len(windows[0])
     total_Fwindows = len(Fwindows[0])
     sample['kept_windows'] = float(total_Fwindows)/float(total_windows)
@@ -1134,7 +1136,6 @@ def parse_irep_args(args):
     '''
     Run argparse
     '''
-
     desc = '# calculate the Index of Replication (iRep)'
     parser = argparse.ArgumentParser(description = desc)
     parser.add_argument(\
@@ -1153,6 +1154,9 @@ def parse_irep_args(args):
             '-mm', required = False, default = 1, type = int, \
             help = 'max. # of read mismatches allowed (default: 1)')
     parser.add_argument(\
+            '-c', required = False, default = 8, type = float, \
+            help = 'window coverage threshold (default = 8 x median)')
+    parser.add_argument(\
             '--sort', action = 'store_true', \
             help = 'optional - sort the sam file')
     parser.add_argument(\
@@ -1170,7 +1174,6 @@ def parse_irep_args(args):
     parser.add_argument(\
             '-t', required = False, default = 6, type = int, \
             help = 'threads (default: 6)')
-
     return parser.parse_args(args)
 
 def main(args):
@@ -1181,6 +1184,7 @@ def main(args):
     args = validate_args(args)
     fastas = open_files(args['f'])
     sams, mm, sort, sort_b = args['s'], args['mm'], args['sort'], args['M']
+
     # generator for mapping
     mappings = [[s, filter_mapping(s, mm, sort, sort_b)] for s in sams]
     # cancel plotting
@@ -1188,7 +1192,7 @@ def main(args):
         args['plot'] = False
     # thresholds
     thresholds = {'min_cov':5, 'min_wins':0.98, 'min_r2':0.90, \
-                    'fragMbp':175, 'GC_min_r2':0.0}
+                  'fragMbp':175, 'GC_min_r2':0.0, 'win_cov':args['c']}
     # calculate iRep
     genomes = iRep(\
                 fastas, mappings, \
