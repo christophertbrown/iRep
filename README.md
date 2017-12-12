@@ -10,6 +10,8 @@ The method is described in:
 
 `pip install iRep`
 
+### Note: iRep requires python 3. For full list of dependencies please see requirements.txt.
+
 ## Scripts:
 
 `iRep` -> measure replication rates using draft-quality genome sequences
