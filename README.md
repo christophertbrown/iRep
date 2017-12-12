@@ -10,7 +10,7 @@ The method is described in:
 
 `pip install iRep`
 
-### Note: iRep requires python 3. For full list of dependencies please see requirements.txt.
+**Note**: iRep requires python 3. For full list of dependencies please see requirements.txt.
 
 ## Scripts:
 
