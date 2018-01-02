@@ -20,7 +20,7 @@ The method is described in:
 
 `bPTR` -> measure replication rates using complete genome sequences (modified from Korem et al. *Science* 2015)
 
-`gc_skew` -> calculate GC skew across complete genome sequences
+`gc_skew.py` -> calculate GC skew across complete genome sequences
 
 ## Example usage:
 
@@ -34,7 +34,7 @@ The method is described in:
 
 ### GC Skew
 
-```$ gc_skew -f sample_data/l_gasseri.fna```
+```$ gc_skew.py -f sample_data/l_gasseri.fna```
 
 #### Example output is provided in sample_output. 
 
