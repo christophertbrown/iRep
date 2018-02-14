@@ -28,9 +28,9 @@ from itertools import product
 from multiprocessing import Pool
 
 # ctb
-from iRep.mapped import get_reads as mapped
+from ctbBio.mapped import get_reads as mapped
+from ctbBio.fasta import iterate_fasta as parse_fasta
 from iRep.gc_skew import gc_skew as gc_skew
-from iRep.fasta import iterate_fasta as parse_fasta
 
 def plot_coverage(coverage, cov_label, avg_cov, fit, c_skew, ori, ter, m_filter, ptr, title):
     """

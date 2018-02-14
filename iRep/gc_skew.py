@@ -25,7 +25,7 @@ from matplotlib import rc
 rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 
 # ctb
-from iRep.fasta import iterate_fasta as parse_fasta
+from ctbBio.fasta import iterate_fasta as parse_fasta
 
 def plot_two(title, subtitle, A, B, labels, legend, vert = False):
     """
