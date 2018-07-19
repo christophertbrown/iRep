@@ -29,6 +29,7 @@ The method is described in:
 ```$ iRep -f sample_data/l_gasseri.fna -s sample_data/l_gasseri*sam -o test.iRep```
 
 NOTE: To save time when analyzing mappings to several genomes, iRep can be run by listing multiple FASTAs as input. 
+
 ```$ iRep -f genome1.fna genome2.fna -o test.iRep``` OR ```$ iRep -f *.fna -o test.iRep```
 
 ### bPTR
